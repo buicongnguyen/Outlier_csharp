@@ -269,6 +269,76 @@ const quizData = {
         "The rest of the method runs and completes the Task the caller is awaiting"
       ],
       explain: "This is the compiler-generated state machine in motion: synchronous prologue, suspension at the incomplete await (return, not block), continuation on completion. The key scalability fact is step 3 — no thread waits out the 200 ms, which is why an async server holds thousands of in-flight requests with a small thread pool."
+    },
+    {
+      level: "senior",
+      q: "You maintain a general-purpose NuGet library. Why should its internal awaits use ConfigureAwait(false), and why doesn't ASP.NET Core application code bother?",
+      options: [
+        ["A library must not resume on whatever SynchronizationContext its caller had — skipping the context avoids deadlocks with blocking callers and needless context hops; ASP.NET Core has no SynchronizationContext, so there is nothing to capture", true],
+        ["ConfigureAwait(false) makes the awaited operations run in parallel instead of sequentially", false],
+        ["It disables the async state machine, removing the overhead of the await", false],
+        ["It forces continuations onto the UI thread, which is safer for consumers", false]
+      ],
+      explain: "By default, await captures the current SynchronizationContext and resumes on it — correct for app code touching UI or request state, but a liability inside a library: if a consumer blocks on your Task from a context-bound thread (WinForms, WPF, legacy ASP.NET), the continuation queued to that context deadlocks. ConfigureAwait(false) says 'resume anywhere'. ASP.NET Core dropped the SynchronizationContext entirely, so in app code there it is a no-op — the guidance is context-dependent, which is exactly why it's a senior-level judgment."
+    },
+    {
+      level: "senior",
+      q: "A hot interface method usually completes synchronously from a cache. Why sign it ValueTask<T> instead of Task<T>, and what new rule does that impose on callers?",
+      options: [
+        ["ValueTask avoids allocating a Task object on the synchronous path; in exchange, a ValueTask must be awaited exactly once and never consumed concurrently or twice", true],
+        ["ValueTask is always faster than Task and imposes no constraints", false],
+        ["ValueTask runs the method on a dedicated high-priority thread; callers must dispose it", false],
+        ["ValueTask caches its result forever, so callers may await it repeatedly for free", false]
+      ],
+      explain: "Task<T> is a class — every call allocates, even when the result was already in memory. ValueTask<T> is a struct that wraps either the result (sync path, zero allocation) or a backing object (async path). The price is a narrower contract: consume it once, then it may be recycled (IValueTaskSource pooling) — awaiting twice, WhenAll-ing it, or blocking on it concurrently is undefined behavior, not just slow. Default to Task; reach for ValueTask when profiling shows the allocation matters on a mostly-synchronous hot path."
+    },
+    {
+      level: "senior",
+      q: "Under load an API's p99 latency climbs to seconds while CPU sits at 15%; dotnet-counters shows the ThreadPool queue growing and thread count creeping up ~1–2 per second. Classic diagnosis?",
+      options: [
+        ["Thread-pool starvation from sync-over-async: pool threads are blocked in .Result/.Wait or synchronous I/O, and the pool injects replacement threads too slowly — fix by making the blocking paths genuinely async", true],
+        ["Garbage-collection thrashing — switch to server GC and the problem disappears", false],
+        ["Kestrel's connection limit is saturated — raise MaxConcurrentConnections", false],
+        ["The CPU is the bottleneck — add instances until CPU utilization falls", false]
+      ],
+      explain: "Low CPU + growing queue + slow thread ramp is the starvation signature: work items sit queued not because the machine is busy but because every pool thread is parked in a blocking wait, and the pool's hill-climbing algorithm only adds threads gradually. GC or CPU saturation would show in their own counters. The cure is removing the blocking (async all the way, async DB drivers), not adding threads — bigger pools just delay the collapse. This failure famously appears only under production load, never in dev."
+    },
+    {
+      level: "senior",
+      q: "You need a lazily-created, thread-safe singleton service in plain C#. Which approach is right, and why?",
+      options: [
+        ["A static readonly field or Lazy<T> — the runtime guarantees once-only, thread-safe initialization; hand-rolled double-checked locking is easy to get subtly wrong and no faster", true],
+        ["A null check in the property getter (if (_instance == null) _instance = new ...) — object writes are atomic so this is safe", false],
+        ["A lock around every access to the instance, forever", false],
+        ["Marking the field volatile is sufficient on its own", false]
+      ],
+      explain: "The CLR runs a type's static initialization exactly once under runtime locking — static readonly (or Lazy<T> for finer control of timing and exception policy) gets correctness for free. The naive null check races: two threads can both see null and both construct, and without volatile/memory barriers a thread can even observe a partially published object under the memory model. Locking every read is correct but pays contention forever. In DI apps, of course, the container's AddSingleton makes the whole question disappear — the pattern matters where there is no container."
+    },
+    {
+      type: "multi",
+      level: "senior",
+      q: "Which of these C# constructs cause hidden heap allocations?",
+      options: [
+        ["A lambda that captures a local variable — closure object plus delegate instance", true],
+        ["Calling an interface method on a struct stored in an interface-typed variable — the struct is boxed", true],
+        ["Calling a params int[] method with three literal ints — an array is allocated per call", true],
+        ["Slicing a ReadOnlySpan<char> with Slice(2, 5)", false],
+        ["Allocating a small buffer with stackalloc", false]
+      ],
+      explain: "The senior skill is seeing allocations the syntax hides: closures lift captured locals onto a compiler-generated heap class; interface dispatch on a struct boxes it (the classic foreach-over-List<T>-via-IEnumerable<T> trap); params conjures an array unless a zero-arg overload exists. Span slicing is arithmetic on a stack struct and stackalloc is, by definition, stack memory. In a per-request path each of these is noise; in a million-iteration loop they are the GC pressure your profiler keeps pointing at."
+    },
+    {
+      type: "order",
+      level: "senior",
+      q: "A production service's memory grows ~50 MB/hour until OOM restarts. Arrange the diagnosis-to-fix workflow.",
+      steps: [
+        "Confirm it is a managed-heap leak: metrics rise steadily across requests and dotnet-counters shows GC heap size (not native memory) growing",
+        "Capture two heap dumps from the affected instance some minutes apart with dotnet-dump",
+        "Diff the dumps' heap statistics to find the type whose instance count and retained bytes keep growing",
+        "Walk that type's GC roots (gcroot) to find the holder — e.g. a static event's invocation list or an unbounded cache dictionary",
+        "Fix the root cause (unsubscribe, weak handler, bounded cache), redeploy, and watch the metric to confirm the slope is flat"
+      ],
+      explain: "A .NET 'leak' is a live-reference leak — the GC cannot collect what is still rooted, and the usual roots are statics: event subscriptions from long-lived publishers, caches without eviction, and captured contexts. Two dumps beat one because growth, not size, identifies the culprit; gcroot turns 'what' into 'who holds it'. The final step is the professional discipline: a fix isn't done until the graph proves it."
     }
   ],
 
@@ -500,6 +570,63 @@ const quizData = {
         "Unit-test OrderService with a FakeGateway — no network, no Stripe account"
       ],
       explain: "The port is defined by the consumer's needs (ChargeAsync, RefundAsync), not by Stripe's API surface — that's what makes it an inversion: the detail adapts to the policy. Constructor injection swaps the hard-wired dependency, the adapter quarantines the SDK at the edge, one line of wiring connects them, and the payoff lands in step 5: business logic testable in milliseconds."
+    },
+    {
+      level: "senior",
+      q: "Two features shared ~70% of their logic, so a helper was extracted. Every feature since has added a flag and a branch to it; the helper now takes six booleans. What is the principal-level read?",
+      options: [
+        ["This is the 'wrong abstraction': the shared shape was coincidental, and each flag couples unrelated features to each other. Inline it back into the callers and let honest duplication reveal the real abstraction — duplication is cheaper than the wrong abstraction", true],
+        ["Convert the six booleans into a strategy pattern with one interface per flag combination", false],
+        ["The helper just needs more unit tests before the next flag is added", false],
+        ["Extract each branch into its own private method to shrink the helper", false]
+      ],
+      explain: "Sandi Metz's rule captures the judgment: an abstraction extracted from accidental similarity decays flag by flag until nobody can change it safely, because every feature's requirements flow through everyone else's code. Wrapping the flags in patterns or tests preserves the coupling — it polishes the wrong thing. Unwinding to duplication feels like a regression but restores independent evolution; if a true shared concept exists, it will re-emerge cleanly. Knowing when to *remove* an abstraction is the senior skill."
+    },
+    {
+      level: "senior",
+      q: "Your published NuGet package's IStorage interface needs a new capability, but hundreds of external implementers exist. Which evolution path avoids breaking them?",
+      options: [
+        ["Ship the member as a default interface method with a sensible base implementation, or introduce a separate optional capability interface (e.g. IBatchStorage) that implementers opt into and consumers type-test for", true],
+        ["Add the member to IStorage directly — implementers just need to recompile", false],
+        ["Bump the major version; semver makes the break acceptable without a migration path", false],
+        ["Have consumers discover the new method via reflection when present", false]
+      ],
+      explain: "Adding an abstract member to a published interface is a source- and binary-breaking change for every implementer — recompiling doesn't help; their classes no longer satisfy the contract. Default interface methods (C# 8+) let the interface grow with a fallback so existing implementations keep working and override when ready; a capability interface achieves the same with older targets. A major-version break is sometimes right, but only as a deliberate choice with a migration path — semver describes breakage, it doesn't excuse it."
+    },
+    {
+      level: "senior",
+      q: "A test suite mocks every dependency and Verifies each internal call; behavior-preserving refactors break dozens of tests. What is the design signal?",
+      options: [
+        ["The tests are coupled to implementation rather than behavior: assert observable outcomes at the boundaries, mock only architecturally significant ports (I/O, external services), and treat 'everything must be mocked' as a coupling smell in the design itself", true],
+        ["The mocks aren't deep enough — mock the dependencies' dependencies too", false],
+        ["This is normal TDD — tests are supposed to change with every refactor", false],
+        ["Delete the unit tests and rely on end-to-end tests only", false]
+      ],
+      explain: "Tests exist to enable refactoring; a suite that shatters when structure changes while behavior doesn't is doing the opposite. Verify(x => x.CalculateTax(...), Times.Once) pins the private choreography — assert the resulting invoice total instead. The deeper signal: if a class can't be tested without faking six collaborators, it has six couplings; fixing the design (fewer, more meaningful ports) fixes the tests. Mocks earn their keep at process boundaries, not between your own classes."
+    },
+    {
+      level: "senior",
+      q: "Invariant: a customer's open orders must never exceed their credit limit. Two concurrent requests each pass the in-memory check, then both SaveChanges — the limit is now exceeded. Robust design?",
+      options: [
+        ["Make the invariant transactional where the data lives: model it as one consistency boundary (aggregate) guarded by an optimistic concurrency token or database constraint, so one of the two commits fails and is retried against fresh state", true],
+        ["Wrap the check and save in a C# lock statement — serialize the requests in memory", false],
+        ["Re-run the check immediately before SaveChanges to shrink the race window", false],
+        ["Cache credit limits in Redis so the checks are faster than the race", false]
+      ],
+      explain: "Check-then-act across a network is inherently racy; shrinking or speeding the window changes the odds, not the outcome, and an in-process lock evaporates the moment you run two instances. Correctness needs the datastore to arbitrate: a rowversion token makes the second SaveChanges throw DbUpdateConcurrencyException (retry with fresh data), or a CHECK/unique constraint rejects it outright. Deciding *which* data must be transactionally consistent — the aggregate boundary — is the actual design decision; everything outside it can be eventually consistent."
+    },
+    {
+      type: "order",
+      level: "senior",
+      q: "You must change the pricing logic buried in a 3,000-line untested legacy class that talks to the database directly. Arrange the professional workflow.",
+      steps: [
+        "Pin current behavior with characterization tests around the class's observable outputs — whatever it does today counts as 'correct'",
+        "Find a seam: extract an interface over the direct database/static calls the pricing logic depends on",
+        "Break the dependency by injecting that interface, so tests can substitute an in-memory fake",
+        "Refactor and change the pricing internals in small steps, keeping the characterization tests green",
+        "Replace the characterization tests with intent-revealing tests that specify the new behavior"
+      ],
+      explain: "This is the legacy-code loop (Feathers): you cannot safely change what you cannot test, and you cannot test without a seam — but creating the seam is itself a change, so characterization tests come first as a safety net that encodes reality, bugs included. Only at the end do tests switch from 'what it does' to 'what it should do'. The anti-pattern this prevents: a big-bang rewrite validated by nothing, discovered broken in production."
     }
   ],
 
@@ -772,6 +899,65 @@ const quizData = {
         "The response travels back up the middleware chain and is written to the socket"
       ],
       explain: "The ordering encodes the framework's design: routing must precede auth because authorization needs the matched endpoint's [Authorize] metadata; binding and validation run just before your handler so it receives typed, checked inputs; and every middleware gets a second chance at the response on the way back out — where response headers, compression, and logging happen."
+    },
+    {
+      level: "senior",
+      q: "After SaveChanges succeeds, the service publishes OrderCreated to the message broker. Crashes and deploys keep producing orders with no event, or events for rolled-back orders. What is the underlying problem?",
+      options: [
+        ["The dual-write problem: a database and a broker cannot be updated atomically, so any crash between the two writes desynchronizes them — reordering the calls just flips which side lies; the fix is a transactional outbox (or CDC), not luck", true],
+        ["The broker needs to be configured for exactly-once delivery", false],
+        ["Publish the event first, then SaveChanges — events matter more than rows", false],
+        ["Wrap both operations in a TransactionScope; brokers enlist in ambient transactions automatically", false]
+      ],
+      explain: "Two independent systems, two commits, no shared transaction: crash after commit #1 and before commit #2 and they disagree — in either order. Broker delivery guarantees are irrelevant; the message was never sent. Mainstream brokers do not enlist in TransactionScope, and distributed 2PC across DB + broker is the cure that's worse than the disease. Recognizing 'this is dual-write' from the symptom — rather than adding retries around it — is precisely the principal-level diagnostic."
+    },
+    {
+      level: "senior",
+      q: "Clients retry POST /payments on timeout; sometimes the original charge had actually succeeded, so customers get double-charged. What is the standard design fix?",
+      options: [
+        ["Idempotency keys: the client sends a unique key per logical operation, the server records the key with the outcome, and duplicate requests replay the stored response instead of re-executing the charge", true],
+        ["Forbid clients from retrying POST requests", false],
+        ["Reduce server latency so timeouts stop happening", false],
+        ["Switch the endpoint to PUT, which is idempotent by definition", false]
+      ],
+      explain: "A timeout is ambiguous — the caller cannot know whether the operation ran. Retries are therefore mandatory for availability, which means the server must make them safe: key + stored result = at-most-once execution with at-least-once requests (this is how Stripe's API works). Banning retries trades correctness for silent failure; faster servers shrink the window without closing it; and PUT's idempotency is a semantic promise you'd still have to implement — the verb alone deduplicates nothing."
+    },
+    {
+      level: "senior",
+      q: "During rolling deploys, old and new app versions run against the same database for several minutes. What does renaming a column safely require?",
+      options: [
+        ["Expand/contract: add the new column, dual-write and backfill, ship code that reads the new column, and only drop the old column in a later release — every intermediate schema must work with both app versions simultaneously", true],
+        ["Rename it in a single migration — EF Core scaffolds renames as non-breaking automatically", false],
+        ["A maintenance window; zero-downtime schema change is not achievable", false],
+        ["Create a database view with the old name so nothing else is needed", false]
+      ],
+      explain: "The rolling window means schema changes deploy against *two* code versions: a hard rename breaks the old version instantly (column not found). Expand/contract splits one breaking change into several backward-compatible ones, each independently deployable and reversible. This constraint also implies migrations must always run *before* the new code fully rolls out, and is why 'drop' steps live a release behind their 'add' counterparts. Views can help but are a partial workaround, not the discipline."
+    },
+    {
+      type: "multi",
+      level: "senior",
+      q: "A downstream dependency has become flaky. Which practices genuinely improve your service's resilience?",
+      options: [
+        ["Timeouts on every outbound call, set below your own callers' deadlines", true],
+        ["A circuit breaker that fails fast once error rates spike and periodically probes for recovery", true],
+        ["Retries with exponential backoff and jitter, applied only to idempotent operations", true],
+        ["Unlimited automatic retries so every request eventually succeeds", false],
+        ["A two-phase-commit distributed transaction spanning your service and the dependency", false]
+      ],
+      explain: "The resilient trio work together: timeouts convert hangs into fast failures (and must nest inside the caller's budget or you time out after they've given up); breakers stop hammering a struggling dependency and give it room to recover; bounded, jittered retries absorb blips without synchronizing into a thundering herd. Unlimited retries are a self-inflicted DDoS that turns a partial outage into a total one. And 2PC couples your availability to theirs — the opposite of resilience; sagas/eventual consistency exist precisely to avoid it."
+    },
+    {
+      type: "order",
+      level: "senior",
+      q: "Implement the transactional outbox pattern for reliable event publishing. Arrange the flow.",
+      steps: [
+        "Begin a database transaction in the request handler",
+        "Save the business entity AND insert the event as a row in an outbox table within that same transaction",
+        "Commit — the state change and the pending event are now atomic: both exist or neither does",
+        "A background relay (e.g. a BackgroundService) polls the outbox and publishes undispatched rows to the broker",
+        "Mark rows as dispatched; because delivery is now at-least-once, consumers deduplicate or stay idempotent"
+      ],
+      explain: "The trick is reducing two resources to one: the event is first written to the same database as the data, where a single local transaction guarantees atomicity. The relay then moves events to the broker asynchronously — a crash mid-publish means a retry, never a loss, shifting the guarantee to at-least-once (hence idempotent consumers, e.g. keyed by event id). This is the standard production answer to the dual-write problem, with CDC (e.g. Debezium) as the log-tailing variant."
     }
   ]
 };
