@@ -1,0 +1,632 @@
+// Quiz bank for csharp-skills.html.
+// Format: quizData.{lang,ood,arch} = [{ q, options: [[text, isCorrect]...], explain }]
+const quizData = {
+  lang: [
+    {
+      q: "A struct Point is assigned: var b = a; b.X = 99;. What is a.X afterwards?",
+      options: [
+        ["Unchanged — structs are value types, so the assignment copied the whole value into an independent b", true],
+        ["99 — a and b refer to the same object", false],
+        ["99, but only if Point is declared readonly", false],
+        ["It depends on whether Point is on the stack or the heap", false]
+      ],
+      explain: "Value-type assignment copies the data itself; b is a separate Point and mutating it cannot affect a. With a class, the assignment would copy the reference and both variables would alias one heap object. This copy semantics is also why large or mutable structs are discouraged — copies happen silently at every assignment, parameter pass, and property read."
+    },
+    {
+      q: "What happens at runtime when an int is assigned to a variable of type object?",
+      options: [
+        ["The int is boxed: a heap object is allocated to wrap the value, and the variable references it", true],
+        ["Nothing — object variables can hold ints directly", false],
+        ["A compile error: int does not derive from object", false],
+        ["The int is converted to a 64-bit pointer-sized integer", false]
+      ],
+      explain: "Every value type derives from object conceptually, but treating one as object requires boxing — allocating a wrapper on the GC heap. Unboxing (casting back to int) checks the type and copies the value out. Boxing is silent and cheap once, but in a loop or a pre-generics collection it creates garbage per element — the main motivation for generics."
+    },
+    {
+      q: "Why is string concatenation with += inside a large loop a performance problem?",
+      options: [
+        ["Strings are immutable, so each += allocates a brand-new string and copies all previous content — O(n²) work; StringBuilder fixes it", true],
+        ["The += operator locks the string for thread safety on every call", false],
+        ["Strings live on the stack and repeatedly overflow into the heap", false],
+        ["It is not a problem — the compiler converts += to StringBuilder automatically", false]
+      ],
+      explain: "A .NET string never changes after creation; s += x builds a whole new string each iteration, copying everything so far. Ten thousand iterations copy roughly 50 million characters. StringBuilder appends into a growable buffer and makes one string at the end. (The compiler does optimize a single expression of several +, but not accumulation across loop iterations.)"
+    },
+    {
+      q: "What is the main advantage of List<int> over the old non-generic ArrayList for storing ints?",
+      options: [
+        ["Type safety and no boxing — elements are stored inline as ints, with no object wrapper or cast on access", true],
+        ["List<int> is thread-safe while ArrayList is not", false],
+        ["List<int> stores elements on the stack", false],
+        ["ArrayList cannot store more than 65,536 elements", false]
+      ],
+      explain: "ArrayList holds object references, so every int inserted is boxed (heap allocation) and every read needs an unboxing cast that can fail at runtime. List<int> is compiled specialized for int: contiguous, unboxed storage, compile-time type checking. Neither collection is thread-safe — that part doesn't change."
+    },
+    {
+      q: "What does the constraint 'where T : IComparable<T>' on a generic method allow?",
+      options: [
+        ["The method body can call CompareTo on values of type T, and only comparable types can be used as T", true],
+        ["It makes T a reference type", false],
+        ["It automatically sorts any collection passed to the method", false],
+        ["It is documentation only and has no compile-time effect", false]
+      ],
+      explain: "Without constraints, a T is only known to be an object — you can call almost nothing on it. The constraint both restricts callers (T must implement IComparable<T>) and empowers the body (CompareTo is now legal). Other common constraints: 'class' / 'struct' to pin the kind, 'new()' to allow construction, or a base-class bound."
+    },
+    {
+      q: "What is the difference between Action<string> and Func<string, int>?",
+      options: [
+        ["Action<string> is a delegate taking a string and returning void; Func<string, int> takes a string and returns an int — the last Func type parameter is the return type", true],
+        ["Action runs synchronously, Func runs on a background thread", false],
+        ["Func can be multicast; Action cannot", false],
+        ["Action is for lambdas, Func is for method references", false]
+      ],
+      explain: "Both are just predefined generic delegate types so you rarely declare your own: Action<...> for void-returning signatures, Func<..., TResult> where the final type argument is the return type. Both can be multicast and both accept lambdas or method groups equally."
+    },
+    {
+      q: "Why declare 'public event EventHandler Click;' instead of a public field of delegate type?",
+      options: [
+        ["The event keyword restricts outsiders to += and −= only; only the declaring class can raise it or overwrite the whole invocation list", true],
+        ["Events run their handlers on the UI thread automatically", false],
+        ["Events are serializable and delegates are not", false],
+        ["There is no difference beyond naming convention", false]
+      ],
+      explain: "A public delegate field lets any code invoke it (firing your notifications) or assign it (wiping every other subscriber with =). The event keyword encapsulates the delegate: external code can only subscribe or unsubscribe. That guarantee is what makes events safe to expose publicly — the observer pattern with compiler enforcement."
+    },
+    {
+      q: "for (int i = 0; i < 3; i++) actions.Add(() => Console.Write(i)); — what do the three delegates print when invoked later?",
+      options: [
+        ["\"333\" — all three lambdas captured the same variable i, which is 3 after the loop ends", true],
+        ["\"012\" — each lambda captured the value of i at creation", false],
+        ["\"000\" — lambdas capture the initial value", false],
+        ["It throws, because i is out of scope when the delegates run", false]
+      ],
+      explain: "Closures capture variables, not values. There is one i for the whole for-loop, hoisted onto a heap object shared by all three lambdas; by invocation time it is 3. Fix: int copy = i; actions.Add(() => Console.Write(copy)); — a fresh variable per iteration. Note foreach was changed in C# 5 to create a new loop variable per iteration, so this trap now mainly bites for-loops."
+    },
+    {
+      q: "var q = list.Where(x => x > 10); list.Add(50); — does the added 50 appear when q is enumerated?",
+      options: [
+        ["Yes — LINQ queries execute lazily at enumeration time, so q sees the list's current contents including 50", true],
+        ["No — the query captured a snapshot of the list when Where was called", false],
+        ["No — Where throws if the source changes after the query is built", false],
+        ["Only if you call q.Refresh() first", false]
+      ],
+      explain: "Where builds a description of a query, not a result; nothing is filtered until foreach/ToList/Count enumerates it. Deferred execution cuts both ways: results reflect later changes, and enumerating twice runs the filter twice. Call ToList() when you want a fixed, materialized snapshot."
+    },
+    {
+      q: "In EF Core, what is the practical difference between Where on IQueryable<T> versus after AsEnumerable()?",
+      options: [
+        ["IQueryable Where is translated into SQL and filters in the database; after AsEnumerable() the filter runs in C# on rows already fetched", true],
+        ["There is none — both produce identical SQL", false],
+        ["AsEnumerable() makes the query run asynchronously", false],
+        ["IQueryable Where is checked at compile time, AsEnumerable Where at runtime", false]
+      ],
+      explain: "IQueryable operators build an expression tree that the provider translates to SQL — the database does the filtering and sends only matches. Once you switch to IEnumerable (AsEnumerable/ToList), subsequent operators are plain delegates running in memory — the earlier query fetched everything. A misplaced AsEnumerable() can turn a 10-row query into a full-table download."
+    },
+    {
+      q: "What happens to the executing thread when an async method awaits a not-yet-complete HTTP call?",
+      options: [
+        ["The method returns to its caller and the thread is freed; the rest of the method resumes as a continuation when the response arrives", true],
+        ["The thread blocks efficiently inside the network driver until the response arrives", false],
+        ["A new dedicated thread is spawned to wait for the response", false],
+        ["The thread spin-waits, polling the socket", false]
+      ],
+      explain: "await on an incomplete Task suspends the method — the compiler-generated state machine registers a continuation and returns. No thread waits on the I/O; the OS completion signals .NET, which schedules the continuation on the thread pool. This is why async servers scale: a thousand pending requests hold buffers, not a thousand blocked threads."
+    },
+    {
+      q: "Why is calling task.Result (or .Wait()) on an async operation dangerous in a UI or classic ASP.NET context?",
+      options: [
+        ["It blocks the context's only thread while the awaited continuation needs that same thread to complete — a deadlock", true],
+        [".Result silently swallows exceptions from the task", false],
+        ["It always returns a stale cached value", false],
+        ["It is fine — .Result is just a synchronous convenience", false]
+      ],
+      explain: "In contexts with a synchronization context (UI thread, old ASP.NET), await schedules its continuation back onto that context. If that thread is blocked in .Result waiting for the task, the continuation can never run — classic sync-over-async deadlock. Rules: async all the way up, and use await instead of .Result/.Wait(). (Exceptions also surface wrapped in AggregateException via .Result — a second annoyance.)"
+    },
+    {
+      q: "When is 'async void' acceptable, and why is it otherwise avoided?",
+      options: [
+        ["Only for event handlers — callers cannot await it, and its exceptions bypass normal handling and can crash the process", true],
+        ["Whenever the result isn't needed — it is the fire-and-forget best practice", false],
+        ["Never — it does not compile", false],
+        ["For any method called from a constructor", false]
+      ],
+      explain: "async void gives the caller no Task: nothing to await, no way to observe completion or exceptions — an unhandled one is rethrown on the synchronization context and can take down the app. Event handler signatures require void, which is the one sanctioned use. Everything else should return Task; for fire-and-forget, store the task or use a safe wrapper that logs faults."
+    },
+    {
+      q: "Three independent web calls each take ~1 s. How do you get all three results in about 1 s total?",
+      options: [
+        ["Start all three tasks first, then await Task.WhenAll(t1, t2, t3) — awaiting each sequentially would take ~3 s", true],
+        ["Use Parallel.For over the three calls", false],
+        ["Mark the method async — awaits inside an async method run concurrently automatically", false],
+        ["Wrap each call in Task.Run to move it to its own thread", false]
+      ],
+      explain: "await t1; await t2; await t3; is sequential — each starts only after the previous finishes. Start them all (var t1 = GetAsync(...); ...) so the I/O overlaps, then Task.WhenAll to await completion of all. Parallel.For is for CPU-bound loops and blocks threads; Task.Run adds pointless threads around operations that are already non-blocking I/O."
+    },
+    {
+      q: "What does 'yield return' inside a method do?",
+      options: [
+        ["Turns the method into a lazy iterator: the compiler builds a state machine that produces one element per MoveNext, running code only as elements are requested", true],
+        ["Returns all elements at once as a List<T>", false],
+        ["Yields the thread to the OS scheduler between elements", false],
+        ["It is shorthand for return inside a loop", false]
+      ],
+      explain: "An iterator method doesn't run when called — it returns an IEnumerable whose enumeration executes the body piecewise, pausing at each yield return. This gives streaming pipelines that never materialize full collections (and can even be infinite). Pitfall: side effects and exceptions inside don't happen until enumeration, which can be far from the call site."
+    },
+    {
+      q: "Why must a FileStream be disposed (via 'using') rather than left to the garbage collector?",
+      options: [
+        ["The GC runs at unpredictable times and doesn't know about OS handles — Dispose releases the file handle deterministically, so the file isn't left locked", true],
+        ["The GC cannot collect objects that implement IDisposable", false],
+        ["Dispose is required to flush the CPU cache", false],
+        ["Disposal prevents the object from being promoted to gen 2", false]
+      ],
+      explain: "The GC manages memory, not files, sockets, or connections; a collectable FileStream might not be finalized for seconds or minutes, keeping the file locked and the handle consumed. using guarantees Dispose on scope exit even when an exception is thrown. The finalizer on such classes is only a safety net — slow, unordered, and never a substitute for using."
+    },
+    {
+      q: "Why are .NET gen 0 garbage collections cheap?",
+      options: [
+        ["Most objects die young, so gen 0 (a small nursery) is collected often, only survivors are copied out, and dead objects cost nothing to reclaim", true],
+        ["Gen 0 objects are allocated on the stack and freed with the stack frame", false],
+        ["The JIT inserts explicit free() calls for gen 0 objects", false],
+        ["Gen 0 collections skip finalizers, which is where all the cost is", false]
+      ],
+      explain: "The generational hypothesis: most allocations are short-lived. Gen 0 is small, so scanning it is fast, and a copying collector's cost is proportional to the survivors, not the garbage — a nursery full of dead temporaries is nearly free to collect. Objects that keep surviving get promoted toward gen 2, whose rare full collections are the expensive ones."
+    },
+    {
+      q: "What is special about allocating an array of 100,000 doubles (≈ 800 KB)?",
+      options: [
+        ["It goes on the Large Object Heap (≥ 85 KB), which is collected only with gen 2 and not compacted by default — prone to fragmentation if churned", true],
+        ["It fails unless you enable gcAllowVeryLargeObjects", false],
+        ["It is allocated on the stack for speed", false],
+        ["Nothing — all arrays are treated identically by the GC", false]
+      ],
+      explain: "Objects of 85 KB and up skip the generational nursery and land on the LOH: collected rarely (with gen 2), and historically not compacted because moving megabyte objects is expensive. Repeatedly allocating and dropping big buffers fragments it and inflates memory. Mitigations: reuse buffers via ArrayPool<T>.Shared, or opt into LOH compaction explicitly."
+    },
+    {
+      q: "With nullable reference types enabled, what does 'string? name' mean versus 'string name'?",
+      options: [
+        ["string? declares that null is an expected value and the compiler requires null checks before dereferencing; string promises the value won't be null — enforced by warnings, not at runtime", true],
+        ["string? is a boxed string with different runtime behavior", false],
+        ["string? allocates lazily on first use", false],
+        ["They are identical — the ? is decorative", false]
+      ],
+      explain: "NRT is compile-time flow analysis: annotate intent (string never null, string? maybe null) and the compiler warns where a maybe-null value is dereferenced unguarded or where null is assigned to a non-nullable. At runtime both are the same string type — no checks are inserted, unlike Nullable<int> which is a real struct. It moves NullReferenceException hunting from production to the build."
+    },
+    {
+      q: "Two record instances: new Point(1, 2) == new Point(1, 2). Result, and why?",
+      options: [
+        ["True — records generate value-based equality comparing members, unlike classes whose default == compares references", true],
+        ["False — they are two distinct heap objects", false],
+        ["Compile error — records do not support ==", false],
+        ["True, but only because small records are interned like strings", false]
+      ],
+      explain: "record generates Equals, GetHashCode, ==/!=, and ToString over the declared members — two records with equal data are equal, which is what you want for DTOs, messages, and dictionary keys. A class with the same fields would compare references and give false. Records also provide 'with' expressions for non-destructive mutation: var moved = p with { X = 5 }."
+    },
+    {
+      q: "What does this switch expression do? var fee = pkg switch { { Weight: > 20 } => 25m, { Express: true } => 15m, _ => 5m };",
+      options: [
+        ["Evaluates patterns top to bottom: heavy packages 25, otherwise express 15, otherwise 5 — order matters and _ is the required catch-all", true],
+        ["Applies all matching arms and sums the fees", false],
+        ["Chooses the most specific pattern regardless of order", false],
+        ["Fails to compile — switch cannot test property values", false]
+      ],
+      explain: "Property patterns test shape and values declaratively; arms are tried in order and the first match wins, so a heavy express package pays 25. Without a matching arm the expression throws, hence the _ discard as default. With records + pattern matching, whole rule tables become single readable expressions — and the compiler warns when arms are unreachable or a value isn't covered."
+    },
+    {
+      q: "What problem does Span<T> solve, and what is its key restriction?",
+      options: [
+        ["Zero-copy, zero-allocation views over slices of arrays/stack/native memory; as a ref struct it can live only on the stack — not in class fields or across await", true],
+        ["Automatic parallelization of loops; it requires .NET Framework 4.8", false],
+        ["Thread-safe shared memory between processes; it must be pinned", false],
+        ["Compression of large arrays; it only works on byte[]", false]
+      ],
+      explain: "Substring, array slicing, and parsing traditionally allocate copies; Span<T> is a (pointer, length) view — slicing is arithmetic, not allocation, and one parsing routine handles arrays, stackalloc, and native buffers. Being a ref struct keeps it safely on the stack, so it cannot be boxed, stored in a field of a class, or cross an await — use Memory<T> for those cases."
+    }
+  ],
+
+  ood: [
+    {
+      q: "What does encapsulation mean in practice for a BankAccount class?",
+      options: [
+        ["Balance is private and changes only through methods like Deposit/Withdraw that enforce invariants — no external code can put the object into an invalid state", true],
+        ["All fields are public so callers can use the object flexibly", false],
+        ["The class is split into partial files to hide code", false],
+        ["The class is sealed so nobody can see its internals", false]
+      ],
+      explain: "Encapsulation is invariant protection: the object owns its state and exposes operations, so 'balance never negative' is enforced in exactly one place. A public Balance setter means every caller everywhere must remember the rule — and one won't. Access modifiers are the mechanism; designing the API around behaviors rather than data is the discipline."
+    },
+    {
+      q: "Shape s = new Circle(); s.Area(); runs Circle's Area. Which mechanism is this?",
+      options: [
+        ["Runtime (subtype) polymorphism — a virtual call dispatches to the object's actual type, letting callers work with any Shape without knowing which", true],
+        ["Method overloading — the compiler picks the best signature", false],
+        ["Reflection — the runtime searches for the method by name", false],
+        ["Implicit conversion from Shape to Circle", false]
+      ],
+      explain: "Virtual dispatch looks up the override in the runtime type's method table, so code written against Shape automatically works for every present and future subclass. Overloading, by contrast, is resolved at compile time from parameter types. Polymorphism is what makes 'add a new shape' a new-class change instead of an edit-every-switch change."
+    },
+    {
+      q: "A base member is virtual and the child uses 'new' instead of 'override'. What happens when the child object is called through a base-typed reference?",
+      options: [
+        ["The base implementation runs — 'new' hides rather than overrides, so base-typed calls never see the child's method", true],
+        ["The child implementation runs, same as override", false],
+        ["A runtime AmbiguousMatchException is thrown", false],
+        ["It fails to compile", false]
+      ],
+      explain: "'new' creates an unrelated method that shares a name: Animal a = new Cat(); a.Speak() runs Animal's version, while ((Cat)c).Speak() runs Cat's. That split personality is almost never intended — use override (requires the base to be virtual/abstract) for polymorphism. The compiler's CS0108 hiding warning exists precisely to catch the accidental case."
+    },
+    {
+      q: "When is an interface the right abstraction rather than an abstract base class?",
+      options: [
+        ["When unrelated types share a capability, or when consumers should mock/swap the dependency — interfaces carry no state and a class can implement many", true],
+        ["When the derived types need shared fields and common constructor logic", false],
+        ["Never since C# 8 — default interface methods made abstract classes obsolete", false],
+        ["Interfaces are only for public APIs; internally classes are always better", false]
+      ],
+      explain: "Interfaces model capabilities (IComparable, ILogger, IDisposable) across unrelated types, and C#'s single inheritance means a class can implement many interfaces but extend one base. Abstract classes earn their place when a family genuinely shares state and partial implementation (Stream). For injected dependencies, prefer interfaces — DI containers and mocking libraries are built around them."
+    },
+    {
+      q: "What does marking a class 'sealed' communicate and enable?",
+      options: [
+        ["No further inheritance: the class wasn't designed as an extension point — and the JIT can devirtualize calls to it", true],
+        ["The class cannot be instantiated — like abstract", false],
+        ["The class is immutable", false],
+        ["The class is excluded from garbage collection", false]
+      ],
+      explain: "Inheritance is a contract you must design for (which members are virtual, what invariants children must keep); sealed opts out explicitly, keeping the type safe to change. It also helps performance: calls to sealed types need no virtual dispatch. Note many style guides suggest sealing by default and unsealing deliberately."
+    },
+    {
+      q: "Why does 'composition over inheritance' usually win for combining behaviors like channel × retry policy?",
+      options: [
+        ["Each axis becomes an injected component that varies independently; inheritance would need a subclass per combination and couples children to base implementation details", true],
+        ["Composition is faster because it avoids virtual calls", false],
+        ["Inheritance is deprecated in modern C#", false],
+        ["Composition lets you use private fields, which inheritance forbids", false]
+      ],
+      explain: "With Sender(IChannel, IRetryPolicy), adding a channel or a policy is one new class and zero edits elsewhere; the inheritance version needs EmailWithRetrySender, SmsWithRetrySender… multiplying per combination. Inheritance also transmits every base-class change to all children (fragile base class). Keep inheritance for genuine is-a with a stable base; reach for has-a everywhere else."
+    },
+    {
+      q: "A ReportService generates the report, writes it to disk, and emails it. Which principle does this violate and what's the standard fix?",
+      options: [
+        ["Single Responsibility — three reasons to change in one class; split into generator, storage, and notifier composed together", true],
+        ["Liskov Substitution — the class can't be substituted for its base", false],
+        ["Interface Segregation — the class has too many interfaces", false],
+        ["Nothing — cohesive classes should do everything about reports", false]
+      ],
+      explain: "Formatting changes, storage changes, and email changes are three independent pressures; bundling them means every change risks the other two behaviors and tests must drag all three along. Split by responsibility and compose (ReportService orchestrating IReportGenerator, IReportStore, INotifier). Symptom to watch for: describing the class honestly requires 'and'."
+    },
+    {
+      q: "A payment switch statement gains a new case with every new provider, each time editing tested code. Which principle addresses this, and how?",
+      options: [
+        ["Open/Closed — define IPaymentProvider and add a new implementation per provider, so existing code is extended rather than modified", true],
+        ["Dependency Inversion — the switch should be moved into the data layer", false],
+        ["Interface Segregation — split the switch across smaller switches", false],
+        ["Single Responsibility — each case should be its own method", false]
+      ],
+      explain: "OCP: new behavior should arrive as new code plugging into an abstraction, not edits to a growing conditional. One interface, one class per provider, and resolution by DI or a keyed lookup — adding Klarna touches zero existing lines. Judgment call: a small stable switch is fine; it's the repeated-edit pattern that signals the refactor."
+    },
+    {
+      q: "Square extends Rectangle, overriding SetWidth to also change height. Code that sets a Rectangle's width to 4 and height to 5 now gets area 25. What is violated?",
+      options: [
+        ["Liskov Substitution — Square changes Rectangle's behavioral contract, so it can't substitute for Rectangle despite the is-a intuition", true],
+        ["Encapsulation — the setters should have been private", false],
+        ["Open/Closed — Square modified Rectangle instead of extending it", false],
+        ["Nothing — mathematically a square is a rectangle, so the model is correct", false]
+      ],
+      explain: "LSP is about behavior, not taxonomy: callers of Rectangle rely on width and height being independent, and Square breaks that postcondition. Same smell: an override throwing NotSupportedException. Fixes: don't inherit (separate types), or abstract over what's genuinely common (IShape.Area). If a subtype needs callers to 'know' which subtype it is, the hierarchy already failed."
+    },
+    {
+      q: "An IMachine interface has Print, Scan, and Fax; the basic printer must throw on Scan and Fax. Which principle is violated?",
+      options: [
+        ["Interface Segregation — split into IPrinter, IScanner, IFax so implementers take only what they support", true],
+        ["Dependency Inversion — the machine should depend on abstractions", false],
+        ["Single Responsibility — printing and scanning belong in one interface, faxing in another", false],
+        ["Open/Closed — interfaces should never gain members", false]
+      ],
+      explain: "Fat interfaces force implementers into stubs and NotSupportedException — which then breaks LSP for callers who trusted the contract. Small role interfaces let the multifunction device implement all three while the basic printer implements one, and let clients depend only on the capability they use (a report module needs IPrinter, not IMachine)."
+    },
+    {
+      q: "OrderService directly instantiates StripeClient with 'new' inside its methods. What does Dependency Inversion say, and what's the concrete benefit?",
+      options: [
+        ["Depend on an IPaymentGateway abstraction and receive it from outside — business logic becomes testable with fakes and the provider is swappable without editing OrderService", true],
+        ["Move the new StripeClient() call into a static helper so it's written once", false],
+        ["Make StripeClient a singleton to avoid repeated construction", false],
+        ["Inherit OrderService from StripeClient to reuse its methods", false]
+      ],
+      explain: "High-level policy (ordering rules) shouldn't reference low-level detail (a specific PSP's SDK). Define the interface the service needs, let StripeGateway implement it, and inject it. Tests hand in a FakeGateway with no network; production wiring lives in one composition root. The 'inversion' is the direction of the dependency arrow: detail depends on abstraction, not vice versa."
+    },
+    {
+      q: "Why is constructor injection preferred over calling provider.GetService<T>() inside methods (service locator)?",
+      options: [
+        ["The constructor states dependencies explicitly and guarantees a fully-initialized object; a locator hides dependencies, couples code to the container, and fails at use-time instead of construction-time", true],
+        ["Constructor injection is faster because reflection is avoided", false],
+        ["Service locator only works with singletons", false],
+        ["There is no practical difference — both get the dependency", false]
+      ],
+      explain: "With constructor injection you can read a class's requirements from its signature, tests can construct it with plain 'new' and fakes, and a missing registration surfaces immediately when the graph is built. Locator calls scatter hidden container lookups through logic — dependencies invisible from the API, failures deferred to whenever the line runs, tests forced to build a container."
+    },
+    {
+      q: "C# events and the IEnumerable/IEnumerator pair are built-in versions of which design patterns?",
+      options: [
+        ["Observer (events: subscribers notified by a publisher) and Iterator (sequential access without exposing the collection's structure)", true],
+        ["Singleton and Factory Method", false],
+        ["Decorator and Adapter", false],
+        ["Strategy and Mediator", false]
+      ],
+      explain: "The GoF patterns predate their .NET shorthands: event/+=/-= is observer with language support; foreach compiles to the iterator protocol (GetEnumerator/MoveNext/Current), with yield return generating the implementation. Recognizing these mappings matters — you rarely hand-roll observer in C#; you declare an event."
+    },
+    {
+      q: "new GZipStream(new BufferedStream(new FileStream(...)), ...) — which pattern is this, and what makes it work?",
+      options: [
+        ["Decorator — each wrapper implements Stream while adding behavior around an inner Stream, so features stack in any combination without subclass explosion", true],
+        ["Composite — the streams form a tree treated as one stream", false],
+        ["Chain of responsibility — each stream may handle or forward requests", false],
+        ["Facade — a simple interface over a complex subsystem", false]
+      ],
+      explain: "Decorator = same abstraction outside, wrapped instance inside, added behavior around delegation. Compression, buffering, and encryption each wrap any Stream, so combinations compose at runtime instead of requiring a CompressedBufferedFileStream class per combo. The same shape appears in DelegatingHandler chains around HttpClient and logging decorators around repositories."
+    },
+    {
+      q: "Shipping cost calculation differs per carrier and changes often. Which pattern fits, and what does it look like with .NET DI?",
+      options: [
+        ["Strategy — an IShippingCalculator interface with one implementation per carrier, injected (or resolved by key) so the algorithm is swappable without touching consumers", true],
+        ["Singleton — one calculator instance shared to keep results consistent", false],
+        ["Template method — a base class with the algorithm hard-coded in order", false],
+        ["Memento — store each carrier's previous results for undo", false]
+      ],
+      explain: "Strategy encapsulates interchangeable algorithms behind one interface; the consumer just calls Calculate and neither knows nor cares which carrier logic ran. With DI this is barely a 'pattern' — register implementations and inject the right one (or an IEnumerable<IShippingCalculator> to pick by carrier code). Adding a carrier = one new class, OCP satisfied."
+    },
+    {
+      q: "You override Equals on a class used as a Dictionary key but leave GetHashCode alone. What breaks?",
+      options: [
+        ["Two 'equal' keys can land in different buckets, so lookups miss entries that are present — the contract requires equal objects to have equal hash codes", true],
+        ["Nothing — GetHashCode has a sensible default that follows Equals", false],
+        ["The dictionary throws NotSupportedException on Add", false],
+        ["Performance drops but correctness is unaffected", false]
+      ],
+      explain: "Hash containers find the bucket by GetHashCode first, then confirm with Equals. Default GetHashCode is identity-based, so two distinct-but-equal instances hash differently and TryGetValue looks in the wrong bucket — items go in and never come out. Override both together and implement IEquatable<T>; or use a record and get the whole cluster generated correctly."
+    },
+    {
+      q: "Why are immutable objects (records with init-only properties) particularly valuable in concurrent code?",
+      options: [
+        ["State that never changes can be shared across threads without locks — no writes means no data races — and references can be handed out without defensive copies", true],
+        ["The runtime stores immutable objects in a special lock-free heap", false],
+        ["Immutable objects are exempt from garbage collection", false],
+        ["They serialize faster because fields are sorted", false]
+      ],
+      explain: "Data races need a writer; remove mutation and readers can share freely — no locks, no torn reads, no defensive cloning. Updates create new versions (p with { X = 5 }), which also keeps old values stable as dictionary keys and cache entries. The cost — allocation per change — is usually noise; measure before abandoning immutability on a hot path."
+    },
+    {
+      q: "A class needs eight constructor parameters, all services. What is this a symptom of, and what's the honest fix?",
+      options: [
+        ["Low cohesion / SRP violation — the class does too much; split it into focused classes, or extract parameter clusters into a cohesive collaborator", true],
+        ["A DI limitation — switch those parameters to service-locator calls", false],
+        ["Nothing — big constructors are normal in enterprise code", false],
+        ["Too much testing — inline the dependencies with 'new' to simplify", false]
+      ],
+      explain: "Constructor injection makes coupling visible — that's a feature. Eight dependencies means eight reasons to change; hiding them (locator, property injection, a god 'context' object) removes the symptom and keeps the disease. Look for clusters that form a missing concept (three params about pricing → PricingEngine) or responsibilities to split. The constructor is the smoke alarm; don't unplug it."
+    }
+  ],
+
+  arch: [
+    {
+      q: "What is the difference between the .NET SDK and the .NET runtime?",
+      options: [
+        ["The SDK contains the toolchain (compilers, dotnet CLI, MSBuild) for building; the runtime only executes apps — dev machines need the SDK, servers just the runtime", true],
+        ["The SDK is for Windows, the runtime for Linux", false],
+        ["The runtime includes Visual Studio; the SDK does not", false],
+        ["They are the same package with different names", false]
+      ],
+      explain: "dotnet build/test/publish need the SDK; a published framework-dependent app needs only the matching runtime on the host (a self-contained publish carries the runtime with it, needing nothing preinstalled). CI images and Dockerfiles reflect this: sdk image for the build stage, slim runtime (aspnet) image for the final stage."
+    },
+    {
+      q: "Why must UseExceptionHandler be registered first (outermost) in the ASP.NET Core pipeline?",
+      options: [
+        ["Middleware wraps everything after it — only as the outermost layer does its try/catch see exceptions from all later middleware and endpoints", true],
+        ["The framework requires it first or throws at startup", false],
+        ["Exception handling is faster when it runs before routing", false],
+        ["Order doesn't matter; middleware runs in dependency order automatically", false]
+      ],
+      explain: "The pipeline is nested like onion layers: each middleware runs code, awaits next(), then resumes. An exception thrown deep in an endpoint propagates back up through the layers — anything registered before the handler is outside its catch. Same logic drives all ordering: routing before auth (auth needs the matched endpoint), CORS before endpoints, and so on."
+    },
+    {
+      q: "Why does UseAuthentication come before UseAuthorization?",
+      options: [
+        ["Authentication establishes who the user is (populates the principal); authorization then decides what they may do — the second question needs the first answered", true],
+        ["Authorization is slower, so it runs later to be skipped on failures", false],
+        ["Alphabetical convention in the templates", false],
+        ["It doesn't matter; they are independent", false]
+      ],
+      explain: "AuthN reads the token/cookie and builds HttpContext.User; AuthZ evaluates [Authorize] policies against that principal. Reversed, authorization sees an anonymous user and rejects everything (or lets [AllowAnonymous] paths through incorrectly). This ordering pair is the most common pipeline bug — 401s on valid tokens with both middlewares present but swapped."
+    },
+    {
+      q: "A request for /logo.png hits UseStaticFiles and the file exists. What happens to the rest of the pipeline?",
+      options: [
+        ["Static files short-circuits: it writes the response and does not call next(), so routing, auth, and endpoints never run for this request", true],
+        ["The pipeline continues; the endpoint can overwrite the file response", false],
+        ["An exception is thrown if any middleware follows static files", false],
+        ["The file is queued and sent after the endpoint responds", false]
+      ],
+      explain: "Any middleware can end the request by responding instead of calling next() — that's the mechanism behind static files, and it's why they're placed early: cheap file hits skip the expensive machinery. Consequence to know: by default static files bypass authorization; protecting downloads requires serving them through an endpoint (or mapping static files with auth requirements)."
+    },
+    {
+      q: "In the DI container, what exactly does a 'scoped' lifetime mean in a web app?",
+      options: [
+        ["One instance per HTTP request: everything resolved during that request shares it, and it is disposed when the request's scope ends", true],
+        ["One instance per class that requests it", false],
+        ["A short-lived cache entry that expires after a configurable time", false],
+        ["One instance per thread", false]
+      ],
+      explain: "ASP.NET Core creates a service scope per request; scoped registrations yield the same instance anywhere within that request and a fresh one for the next. That's the natural unit-of-work lifetime — DbContext is registered scoped for exactly this reason. Singleton = per process (must be thread-safe); transient = new object every resolution."
+    },
+    {
+      q: "A singleton CacheWarmer takes DbContext in its constructor. Why is this a bug?",
+      options: [
+        ["Captive dependency: the scoped DbContext gets trapped in the singleton for the process lifetime, shared across concurrent requests — and DbContext is not thread-safe", true],
+        ["Singletons cannot have constructor parameters", false],
+        ["DbContext is too large to hold in memory long-term", false],
+        ["It's fine — the container refreshes the context per request automatically", false]
+      ],
+      explain: "The container injects once at singleton construction; 'scoped' becomes meaningless for that instance. Two simultaneous requests then use one change tracker and connection — corrupt state, intermittent crashes. Development-mode scope validation throws for exactly this. Fix: inject IServiceScopeFactory, and per operation: using var scope = factory.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();"
+    },
+    {
+      q: "A BackgroundService processes a queue forever and needs a DbContext per item. Correct pattern?",
+      options: [
+        ["Create a scope per iteration with IServiceScopeFactory, resolve the DbContext from it, and let scope disposal clean up — honoring the stopping CancellationToken", true],
+        ["Inject the DbContext into the BackgroundService constructor since it lives as long as the service", false],
+        ["Use one static DbContext for the whole app to save allocations", false],
+        ["BackgroundService cannot use DbContext; call raw ADO.NET instead", false]
+      ],
+      explain: "Hosted services are singletons, so constructor-injecting scoped services is the captive-dependency bug again. The sanctioned pattern is a scope per unit of work inside ExecuteAsync's loop — fresh context, tracked entities released each iteration. Respect stoppingToken so shutdown is graceful: the host signals it, waits, then aborts."
+    },
+    {
+      q: "Why is DbContext designed to be short-lived (per request/unit of work) rather than shared?",
+      options: [
+        ["It is not thread-safe and its change tracker accumulates every entity it loads — a long-lived shared context means races, stale data, and unbounded memory growth", true],
+        ["Each DbContext opens a permanent database connection that must be rationed", false],
+        ["The license restricts concurrent usage per instance", false],
+        ["Short lives force more SQL round trips, which EF prefers", false]
+      ],
+      explain: "One context = one unit of work: load, modify, SaveChanges, dispose. Tracked entities are never forgotten until disposal, so an immortal context grows without bound and serves increasingly stale snapshots; concurrent use corrupts the tracker outright. Connections aren't the issue — ADO.NET pools them under the hood. Scoped DI lifetime encodes all this by default."
+    },
+    {
+      q: "foreach (var order in db.Orders.ToList()) Console.WriteLine(order.Customer.Name); runs 1 + N queries. Best fixes?",
+      options: [
+        ["Eager-load with Include(o => o.Customer), or better, project just the needed fields with Select — one query either way", true],
+        ["Increase the connection pool size so the N queries run in parallel", false],
+        ["Wrap the loop in a transaction to batch the queries", false],
+        ["Call ToList() twice so the customers are cached", false]
+      ],
+      explain: "With lazy loading, each o.Customer access fires its own SELECT — invisible in code, brutal at 1000 rows. Include emits a JOIN up front; a projection (Select(o => new { o.Id, o.Customer.Name })) is usually better still: one query, only the needed columns, no change tracking. Watch EF's SQL logs — N+1 is unmissable once you look."
+    },
+    {
+      q: "When should you add AsNoTracking() to an EF Core query?",
+      options: [
+        ["Read-only queries — skipping change-tracking setup saves time and memory when you'll never call SaveChanges on those entities", true],
+        ["Every query — tracking is legacy behavior", false],
+        ["Only queries returning more than 1000 rows", false],
+        ["Write-heavy code, so SaveChanges runs faster", false]
+      ],
+      explain: "Tracking exists to detect your modifications at SaveChanges; a GET endpoint that shapes entities into a response never modifies, so tracking is pure overhead. AsNoTracking (or projections to DTOs, which are untracked automatically) is the standard read-path optimization. Keep tracking on the update path — load, mutate, SaveChanges depends on it."
+    },
+    {
+      q: "What are EF Core migrations for?",
+      options: [
+        ["Versioned, code-generated schema changes that evolve the database in step with the model — reviewable in git and applied in order per environment", true],
+        ["Moving data between two different database servers", false],
+        ["Automatic query optimization based on production telemetry", false],
+        ["Converting the database between SQL dialects", false]
+      ],
+      explain: "dotnet ef migrations add diffs your model against the last snapshot and scaffolds Up/Down code; the database records which migrations are applied. Schema history lives in source control next to the code that needs it. In production, prefer generating idempotent SQL scripts (or migration bundles) applied by CI/CD over Database.Migrate() racing at app startup."
+    },
+    {
+      q: "The same setting exists in appsettings.json, appsettings.Production.json, and an environment variable. In Production, which value wins?",
+      options: [
+        ["The environment variable — providers added later override earlier ones: base json ← environment json ← env vars ← command line", true],
+        ["appsettings.json — the base file is authoritative", false],
+        ["appsettings.Production.json — environment files always win", false],
+        ["Startup fails on the conflict", false]
+      ],
+      explain: "IConfiguration merges layers with last-writer-wins per key. The default host order is appsettings.json, appsettings.{Environment}.json, user secrets (dev), environment variables, command-line args. This lets one build run everywhere: defaults in the repo, per-environment overrides on the host — env vars being how containers and cloud platforms inject config (use __ as the section separator)."
+    },
+    {
+      q: "Where do secrets like connection strings and API keys belong?",
+      options: [
+        ["Outside the repo: user-secrets for local dev, environment variables or a vault (Azure Key Vault, AWS Secrets Manager) in production — never committed to git", true],
+        ["In appsettings.json — that is what it exists for", false],
+        ["Encrypted inside the compiled assembly as constants", false],
+        ["In a private git repository, which is safe because access is restricted", false]
+      ],
+      explain: "Anything committed lives in history forever, gets cloned to every laptop and CI runner, and leaks with the repo. dotnet user-secrets stores dev values outside the project tree while binding into IConfiguration exactly like appsettings — code never knows the difference. Production values come from the platform (env vars, mounted secrets, Key Vault provider), and rotation never requires a commit."
+    },
+    {
+      q: "logger.LogInformation(\"Order {OrderId} failed for {UserId}\", id, userId) — why is this better than string interpolation ($\"...\")?",
+      options: [
+        ["It is structured logging: OrderId and UserId are captured as named fields, so sinks can index, filter, and query them — interpolation collapses everything into one opaque string", true],
+        ["It avoids a compile error — ILogger rejects interpolated strings", false],
+        ["Placeholders are encrypted in transit", false],
+        ["No difference; both produce identical output", false]
+      ],
+      explain: "Message templates keep the data separate from the text: Seq/Application Insights/ELK store OrderId=1234 as a field, so 'all logs for this order' is a query, not a regex. Interpolation also pays string formatting even when the log level is off; templates defer it. The template string is the event's identity, letting sinks group occurrences of the same event."
+    },
+    {
+      q: "In xUnit, when do you use [Theory] with [InlineData] instead of [Fact]?",
+      options: [
+        ["When the same test logic should run over multiple input/expected-output cases — each InlineData row becomes a separately reported test case", true],
+        ["When the test needs async/await support", false],
+        ["When the test must run first, before all Facts", false],
+        ["Theory marks slow integration tests; Fact marks fast unit tests", false]
+      ],
+      explain: "A Fact is one case; a Theory is parameterized — [InlineData(2, 3, 5)] rows flow into the test's parameters and each row passes or fails independently, which beats copy-pasting near-identical facts. MemberData/ClassData supply richer cases. Also worth knowing: xUnit creates a fresh test-class instance per test, so the constructor is per-test setup and IDisposable is teardown."
+    },
+    {
+      q: "Why does mocking OrderService's payment dependency require IPaymentGateway rather than a concrete StripeGateway with non-virtual methods?",
+      options: [
+        ["Moq builds its fake by implementing the interface (or overriding virtuals) in a dynamic proxy — non-virtual concrete members can't be intercepted", true],
+        ["Moq can mock anything; interfaces are just a style preference", false],
+        ["Concrete classes are sealed by default in .NET, blocking mocks", false],
+        ["Interfaces run faster in test environments", false]
+      ],
+      explain: "Moq generates a runtime subclass/implementation — it can fill in interface members or override virtual ones, but a non-virtual method call can't be redirected. This is why 'depend on abstractions' and 'testable' are the same advice in .NET: an interface port makes Setup/Verify trivial (mock.Setup(g => g.ChargeAsync(...)).ReturnsAsync(...)) with no network in sight."
+    },
+    {
+      q: "What does WebApplicationFactory<Program> give an integration test?",
+      options: [
+        ["The real app booted in memory — actual pipeline, routing, DI, and serialization — with an HttpClient, plus hooks to override services (e.g., swap the DB) for the test", true],
+        ["A deployment of the app to a local IIS instance", false],
+        ["A static mock of HttpContext for controller unit tests", false],
+        ["A UI browser automation driver", false]
+      ],
+      explain: "It runs Program.cs against an in-memory test server: requests exercise middleware, auth, model binding, filters, and JSON exactly as production would — the classes-in-isolation gaps that unit tests miss. WithWebHostBuilder lets you replace registrations (Testcontainers DB, fake external APIs). A handful of these around your endpoints catch a disproportionate share of real bugs."
+    },
+    {
+      q: "Why is 'new HttpClient()' per request a production bug, and what is the fix?",
+      options: [
+        ["Each instance's handler opens fresh connections and disposed sockets linger in TIME_WAIT — under load you exhaust sockets; use IHttpClientFactory (AddHttpClient), which pools and recycles handlers", true],
+        ["HttpClient is obsolete; use WebClient", false],
+        ["Each HttpClient spawns a dedicated thread", false],
+        ["It's only a problem on Linux", false]
+      ],
+      explain: "HttpClient is a thin wrapper over a message handler that owns the connection pool. New-per-request throws the pool away each time (socket exhaustion); one static client forever never re-resolves DNS (stale endpoints after failover). The factory pools handlers and rotates them periodically — both problems solved, plus per-name configuration, Polly resilience policies, and typed clients."
+    },
+    {
+      q: "In clean architecture, which project references nothing else in the solution, and what enforces the rule?",
+      options: [
+        ["The Domain project — entities and business rules with zero framework dependencies; project references only point inward, so the compiler itself polices the architecture", true],
+        ["The Web project — it must stay isolated from business logic", false],
+        ["Infrastructure — it is generated code that nothing should reference", false],
+        ["All projects reference each other freely; discipline comes from code review", false]
+      ],
+      explain: "Domain sits at the center: no EF, no ASP.NET, no HTTP — pure rules that compile and test alone. Application defines the ports (interfaces) it needs; Infrastructure references Application to implement them; Web wires everything. Because 'dependencies point inward' is expressed as csproj references, violating it is a build error, not a review comment. Payoff: frameworks and databases become swappable details."
+    },
+    {
+      q: "The application layer defines IOrderRepository and infrastructure implements it with EF Core. Why does the interface live in the inner layer?",
+      options: [
+        ["The inner layer owns the contract it needs (a 'port'); infrastructure adapts to it — putting the interface in infrastructure would invert the dependency direction and couple use cases to EF", true],
+        ["Interfaces compile faster in smaller projects", false],
+        ["EF Core requires interfaces in a separate assembly", false],
+        ["Convention only — the location has no consequences", false]
+      ],
+      explain: "This is the dependency-inversion move at architecture scale: the use case declares what persistence it needs, in its own terms (GetPendingOrders, not SQL). Infrastructure references the inner project and supplies the adapter. Tests fake the port with an in-memory list. If the interface lived beside its EF implementation, Application would have to reference Infrastructure — arrows pointing outward, framework leaking in."
+    },
+    {
+      q: "What distinguishes a framework-dependent publish from a self-contained one?",
+      options: [
+        ["Framework-dependent is small but requires the right .NET runtime on the host; self-contained bundles the runtime — bigger output that runs on a bare machine and pins its own .NET version", true],
+        ["Self-contained builds run only in Docker containers", false],
+        ["Framework-dependent apps cannot use NuGet packages", false],
+        ["Self-contained is Windows-only", false]
+      ],
+      explain: "dotnet publish defaults to framework-dependent: portable, small, patched centrally by runtime updates on the host. Self-contained (-r linux-x64 --self-contained) ships everything — nothing to install, immune to host runtime drift, at ~70+ MB unless trimmed. Native AOT goes further: compiled to a single native binary, fastest cold start, with reflection restrictions. Containers blur the choice — the runtime ships in the base image either way."
+    },
+    {
+      q: "What is CQRS, in its practical everyday form?",
+      options: [
+        ["Separating the write model (commands enforcing domain rules) from the read model (queries returning shaped DTOs, often bypassing the domain) — each side optimized for its job", true],
+        ["A caching layer that queues writes for batch processing", false],
+        ["Encrypting queries separately from commands", false],
+        ["A SQL Server replication feature", false]
+      ],
+      explain: "Reads and writes want different things: writes need invariants and rich domain objects; reads want flat, fast projections of exactly what the screen shows. Everyday CQRS is just two paths — command handlers using the domain model, query handlers using projections or Dapper — often organized with MediatR. Full CQRS with separate stores and event sourcing is a serious escalation; adopt it for the specific aggregate that needs it, not by default."
+    }
+  ]
+};

@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Revision notes and multiple-choice practice for the C# language and .NET runtime, object-oriented design, and application architecture with frameworks and tools.">
+  <title>C# Skills Revision and MCQ Practice</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .sub { margin-top: 24px; }
+    .term-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
+    .term-card { background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); padding:14px; }
+    .term-card h3 { margin-bottom:6px; color:var(--accent-strong); }
+    .term-card p { color:var(--muted); margin-bottom:0; }
+    .def-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:0 22px; margin:0; padding:8px 18px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .def-list > div { padding:9px 0; border-bottom:1px solid var(--line); }
+    .def-list dt { font-weight:700; color:var(--accent-strong); }
+    .def-list dd { margin:2px 0 0; color:var(--muted); }
+    .diagram { margin:14px 0 0; padding:14px 16px; overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:8px; font-family:Consolas,Menlo,monospace; font-size:13px; line-height:1.45; color:var(--text); }
+    .diagram-title { margin:16px 0 0; font-size:13px; font-weight:700; color:var(--accent-strong); text-transform:uppercase; }
+    .score-bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:18px 0; padding:12px 15px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .score-bar strong { font-size:17px; }
+    .score-bar .section-note { margin:0; flex:1 1 260px; }
+    .score-bar .bar-buttons { display:flex; gap:8px; margin-left:auto; }
+    .sec-score { display:inline-flex; align-items:center; min-height:30px; margin:14px 0 0; padding:4px 12px; border:1px solid var(--accent); border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); font-size:13px; font-weight:700; }
+    .quiz { margin-top:12px; }
+    .quiz-card { margin:10px 0; padding:14px 15px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .quiz-card p.q { margin-bottom:10px; font-weight:700; }
+    .options { display:grid; gap:8px; }
+    .options button { min-height:40px; padding:8px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font-size:15px; text-align:left; cursor:pointer; }
+    .options button:hover:enabled { border-color:var(--accent); background:var(--accent-soft); }
+    .options button:disabled { cursor:default; opacity:0.85; }
+    .options button.correct { border-color:var(--accent-strong); background:var(--accent-soft); color:var(--accent-strong); font-weight:700; opacity:1; }
+    .options button.incorrect { border-color:var(--warn); background:var(--warn-soft); color:var(--warn); font-weight:700; opacity:1; }
+    .explain { display:none; margin:10px 0 0; padding:10px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; color:var(--text); }
+    .explain.show { display:block; }
+    .show-all .explain { display:block; }
+    .show-all .options button[data-correct="1"] { border-color:var(--accent-strong); background:var(--accent-soft); color:var(--accent-strong); font-weight:700; }
+    .verdict { font-weight:700; }
+    .verdict.good { color:var(--accent-strong); }
+    .verdict.bad { color:var(--warn); }
+    .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .bar-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
+    .bar-btn.secondary { background:var(--panel); color:var(--text); border-color:var(--line); }
+    .bar-btn.secondary:hover { border-color:var(--accent); color:var(--accent-strong); background:var(--accent-soft); }
+    .source-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+    .source-grid article { padding:14px; margin-bottom:0; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">C# &amp; .NET study hub</p>
+      <h1>C# Skills Revision and MCQ Practice</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="index.html">Hub</a>
+      <a href="#lang">Language &amp; Runtime</a>
+      <a href="#ood">OO Design</a>
+      <a href="#arch">Architecture</a>
+      <a href="#resources">Resources</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="section intro">
+      <h2>Study Goal</h2>
+      <p>
+        Revision notes and practice questions for C# software-engineering assessment work, covering three
+        areas: the C# language and .NET runtime, object-oriented design, and application architecture with
+        the common frameworks and tools. Each section has a definitions list, core-concept cards with
+        tradeoffs and pitfalls, ASCII diagrams and code walkthroughs where a picture helps, further-reading
+        links, and a bank of multiple-choice questions with explanations. Difficulty runs from recall up to
+        applied reasoning.
+      </p>
+    </section>
+
+    <div class="score-bar" id="score-bar">
+      <strong id="score-text">Score: 0 / 0</strong>
+      <p class="section-note" id="score-note"></p>
+      <div class="bar-buttons">
+        <button class="bar-btn secondary" id="toggle-explain" type="button">Show all explanations</button>
+        <button class="bar-btn" id="retry" type="button">Retry (reshuffle)</button>
+      </div>
+    </div>
+
+    <!-- ================= 1. C# LANGUAGE & .NET RUNTIME ================= -->
+    <section id="lang" class="section">
+      <h2>1. C# Language &amp; .NET Runtime</h2>
+      <p class="section-note">
+        What actually happens between your source file and the CPU: the type system, the features that make
+        C# feel like C# (generics, delegates, LINQ, async/await), and the managed runtime underneath —
+        JIT compilation, the garbage collector, and the escape hatches for when allocation matters.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>CLR (Common Language Runtime)</dt><dd>The .NET virtual machine: loads assemblies, JIT-compiles IL to native code, manages memory (GC), enforces type safety, and handles exceptions.</dd></div>
+        <div><dt>IL / JIT</dt><dd>The C# compiler (Roslyn) emits Intermediate Language into assemblies; the JIT compiler translates IL to native machine code at run time, method by method, with tiered compilation re-optimizing hot paths.</dd></div>
+        <div><dt>Assembly</dt><dd>The unit of deployment and versioning: a .dll or .exe containing IL, metadata, and a manifest. NuGet packages ship assemblies.</dd></div>
+        <div><dt>Value type</dt><dd><code>struct</code>, <code>enum</code>, and the built-in numerics: the variable <em>is</em> the data. Assignment copies the whole value; stored inline (stack, or inside its containing object).</dd></div>
+        <div><dt>Reference type</dt><dd><code>class</code>, <code>interface</code>, <code>delegate</code>, <code>string</code>, arrays: the variable holds a reference to an object on the GC heap. Assignment copies the reference — both variables then point at the same object.</dd></div>
+        <div><dt>Boxing / unboxing</dt><dd>Wrapping a value type in a heap object to treat it as <code>object</code> (boxing), and casting it back out (unboxing). Silent, allocating, and a classic hidden cost — generics were added largely to avoid it.</dd></div>
+        <div><dt>Generics</dt><dd>Types and methods parameterized by type (<code>List&lt;T&gt;</code>): compile-time type safety without casts or boxing. Constraints (<code>where T : IComparable&lt;T&gt;</code>) let the body use members of T.</dd></div>
+        <div><dt>Delegate</dt><dd>A type-safe reference to a method (or several — delegates are multicast). <code>Action&lt;T&gt;</code> and <code>Func&lt;T,TResult&gt;</code> are the standard generic delegate types.</dd></div>
+        <div><dt>Event</dt><dd>A delegate field with restricted access: outside code can only subscribe (<code>+=</code>) and unsubscribe (<code>−=</code>); only the declaring class can invoke it. The language-level observer pattern.</dd></div>
+        <div><dt>Lambda / closure</dt><dd><code>x =&gt; x * 2</code> creates a delegate inline. Capturing a local variable creates a closure — the variable is lifted to a compiler-generated heap object shared by the lambda and the enclosing method.</dd></div>
+        <div><dt>LINQ</dt><dd>Language Integrated Query: composable operators (<code>Where</code>, <code>Select</code>, <code>GroupBy</code>…) over <code>IEnumerable&lt;T&gt;</code> (delegates, in-memory) or <code>IQueryable&lt;T&gt;</code> (expression trees, translated to SQL by providers like EF Core).</dd></div>
+        <div><dt>Deferred execution</dt><dd>A LINQ query is a description, not a result: nothing runs until you enumerate it (foreach, <code>ToList()</code>, <code>Count()</code>). Enumerating twice runs it twice.</dd></div>
+        <div><dt>Extension method</dt><dd>A static method invoked as if it were an instance method on its first (<code>this</code>-marked) parameter. How LINQ adds 50 operators to every IEnumerable without touching it.</dd></div>
+        <div><dt>async / await</dt><dd>Compiler-rewritten asynchrony: <code>await</code> suspends the method without blocking the thread, then resumes when the awaited <code>Task</code> completes. For I/O-bound work; CPU-bound work uses <code>Task.Run</code>.</dd></div>
+        <div><dt>Task / Task&lt;T&gt;</dt><dd>A promise of a future result (or completion). Not a thread — an I/O Task typically occupies no thread at all while waiting.</dd></div>
+        <div><dt>iterator (yield return)</dt><dd>A method that produces a lazy sequence one element at a time; the compiler builds the state machine. Backbone of custom IEnumerable implementations.</dd></div>
+        <div><dt>IDisposable / using</dt><dd>The contract for deterministic cleanup of non-memory resources (files, sockets, DB connections). <code>using</code> guarantees <code>Dispose()</code> runs even on exception — the GC alone gives no timely cleanup.</dd></div>
+        <div><dt>GC generations</dt><dd>The garbage collector partitions the heap: gen 0 (new, collected often, cheap), gen 1 (survivors), gen 2 (long-lived, collected rarely, expensive), plus the Large Object Heap (≥ 85 KB).</dd></div>
+        <div><dt>Nullable reference types</dt><dd>Opt-in compile-time null analysis: <code>string</code> means never null, <code>string?</code> means maybe null, and the compiler warns on unguarded dereference. Annotations, not runtime enforcement.</dd></div>
+        <div><dt>record</dt><dd>A type declared for its data: compiler-generated value-based equality, <code>ToString</code>, and non-destructive mutation via <code>with</code>. Records are immutable by convention (init-only properties).</dd></div>
+        <div><dt>Pattern matching</dt><dd><code>is</code> patterns and <code>switch</code> expressions that test shape — type, properties, relations — and bind variables in one step: <code>if (shape is Circle { Radius: &gt; 0 } c)</code>.</dd></div>
+        <div><dt>Span&lt;T&gt; / Memory&lt;T&gt;</dt><dd>A safe view over a slice of contiguous memory (array, stack, native) without copying or allocating. Span is stack-only (<code>ref struct</code>); Memory can live on the heap and cross await boundaries.</dd></div>
+        <div><dt>String immutability</dt><dd>Strings never change after creation; every Concat/Replace/Substring makes a new one. Repeated concatenation in a loop is O(n²) allocations — use <code>StringBuilder</code>.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>Value vs reference semantics</h3><p>Assigning a struct copies the data; assigning a class copies the pointer. That is the whole difference — and the source of the classic bugs: mutating a struct you got from a property mutates the copy, not the original (which is why structs should be small and immutable); two class variables aliasing one object see each other's changes. <code>==</code> follows suit: reference identity for classes (unless overloaded, as string does), field-by-field only if you implement it — or use a record.</p></article>
+        <article class="term-card"><h3>Generics beat object</h3><p><code>List&lt;int&gt;</code> stores ints inline: no boxing, no casts, and the JIT compiles a specialized version for each value type. The pre-generics alternative — collections of <code>object</code> — costs an allocation per element and a runtime cast per read. Constraints make generic code useful: <code>where T : IComparable&lt;T&gt;</code> lets you sort, <code>where T : new()</code> lets you construct, <code>where T : class/struct</code> pins the kind. Pitfall: <code>T ==</code> comparisons and reflection-heavy generic code reintroduce the costs generics were meant to remove.</p></article>
+        <article class="term-card"><h3>Delegates → events → LINQ</h3><p>One idea builds on the next: a delegate is a method you can pass around; an event is a delegate only its owner may fire; a lambda is a delegate you write inline; LINQ is a library of methods taking those lambdas. Two pitfalls pay rent forever: an event subscription from a long-lived publisher keeps the subscriber alive (the classic .NET memory leak — unsubscribe or use weak patterns), and a captured loop variable is shared by all iterations' lambdas unless you copy it locally (fixed for <code>foreach</code> in C# 5, still true for <code>for</code>).</p></article>
+        <article class="term-card"><h3>async/await mechanics</h3><p>The compiler rewrites an async method into a state machine: code up to the first <code>await</code> runs synchronously; at the await, if the task isn't finished, the method <em>returns</em> to its caller and the rest is scheduled as a continuation. No thread sits blocked — that is why one server can hold thousands of pending requests. Rules that keep you safe: async all the way (blocking with <code>.Result</code>/<code>.Wait()</code> invites deadlocks in UI/legacy ASP.NET contexts), <code>async void</code> only for event handlers (its exceptions are uncatchable by the caller), and use <code>Task.WhenAll</code> to run independent work concurrently instead of awaiting sequentially.</p></article>
+        <article class="term-card"><h3>GC reality and IDisposable</h3><p>Allocation is cheap (pointer bump) and gen 0 collections are fast; cost comes from objects that survive into gen 2 or the LOH, and from mid-life objects that die just after promotion. The GC knows nothing about files, sockets, or connections — that's IDisposable's job, and <code>using</code> makes cleanup deterministic. Finalizers are a safety net, not a strategy: they delay reclamation by a full GC cycle and run on their own thread. Performance work in .NET is usually allocation work: measure with dotnet-counters/PerfView before touching code.</p></article>
+        <article class="term-card"><h3>Modern C# idioms</h3><p>Post-C#-8 code reads differently: records for DTOs and messages (value equality + <code>with</code> for change-a-copy), switch expressions with property patterns instead of if-chains, nullable reference types making "can this be null?" a compiler question, target-typed <code>new()</code>, and file-scoped namespaces. Span&lt;T&gt; sits at the performance end: parsing and slicing without substrings or copies. Idiomatic modern C# is immutable-by-default at the edges (inputs, messages) and mutable only where measured hot paths demand it.</p></article>
+      </div>
+
+      <p class="diagram-title">From source to CPU — the .NET compilation pipeline</p>
+      <pre class="diagram">Program.cs ──(Roslyn, build time)──▶ IL + metadata in MyApp.dll ──(NuGet deps alongside)
+                                              │
+                                     run:  dotnet MyApp.dll
+                                              │
+                                     CLR loads assembly
+                                              │
+                            JIT compiles each method on first call
+                              tier 0: fast compile, no optimization
+                              tier 1: hot methods recompiled optimized
+                                              │
+                                        native code executes
+                                 (GC, exceptions, type safety = CLR services)
+
+AOT alternative: dotnet publish -p:PublishAot=true  →  native binary, no JIT,
+faster start, smaller memory — but no runtime codegen (limits some reflection)</pre>
+
+      <p class="diagram-title">Value vs reference type — what assignment copies</p>
+      <pre class="diagram">struct Point { int X, Y; }              class Person { string Name; }
+
+var a = new Point(1, 2);                var p = new Person("Ann");
+var b = a;            // copies data    var q = p;          // copies reference
+b.X = 99;                               q.Name = "Bob";
+
+  STACK                                   STACK           HEAP
+  a: [X=1|Y=2]   ← unchanged             p: (ref) ──┐
+  b: [X=99|Y=2]  ← independent copy      q: (ref) ──┴──▶ [Name="Bob"]
+
+a.X is still 1                          p.Name is "Bob" too — one object,
+                                        two variables aliasing it</pre>
+
+      <p class="diagram-title">async/await — what the thread actually does</p>
+      <pre class="diagram">async Task&lt;string&gt; GetUserAsync(int id) {
+    var http = ...;                          // ── runs synchronously on caller thread
+    var json = await http.GetStringAsync(u); // ── not done? method RETURNS here
+    return Parse(json);                      // ── continuation: runs after response
+}
+
+timeline (thread view):
+
+caller thread:  ──[start method]──[hit await, return Task]──▶ free to serve
+                                                              other work!
+network:                 ░░░░░░ request in flight ░░░░░░
+thread pool:                                        ──[Parse(json), complete Task]──▶
+
+nobody blocks during ░░░░ — an I/O Task holds no thread.
+compare Thread.Sleep / .Result: the thread sits occupied doing nothing.</pre>
+
+      <p class="diagram-title">GC generations — why most collections are cheap</p>
+      <pre class="diagram">allocation ──▶ ┌─ gen 0 ─┐  collected constantly, survivors promoted
+               │ new     │──┐
+               └─────────┘  ▼
+               ┌─ gen 1 ─┐  buffer between young and old
+               │ recent  │──┐
+               └─────────┘  ▼
+               ┌─ gen 2 ─┐  long-lived: caches, statics, singletons
+               │ old     │  collected rarely — expensive full GC
+               └─────────┘
+               ┌─ LOH ───┐  objects ≥ 85 KB (big arrays) — collected
+               │ large   │  with gen 2, historically not compacted
+               └─────────┘
+generational hypothesis: most objects die young → collect the nursery
+often and cheaply, touch the old heap rarely</pre>
+
+      <div class="link-list">
+        <a href="https://learn.microsoft.com/en-us/dotnet/csharp/" target="_blank" rel="noopener">C# documentation — Microsoft Learn</a>
+        <a href="https://learn.microsoft.com/en-us/dotnet/csharp/asynchronous-programming/" target="_blank" rel="noopener">Asynchronous programming in C#</a>
+        <a href="https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals" target="_blank" rel="noopener">Fundamentals of garbage collection</a>
+        <a href="https://learn.microsoft.com/en-us/dotnet/csharp/linq/" target="_blank" rel="noopener">LINQ overview</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-lang">Section score: 0 / 0</span>
+      <div class="quiz" data-section="lang"></div>
+    </section>
+
+    <!-- ================= 2. OBJECT-ORIENTED DESIGN ================= -->
+    <section id="ood" class="section">
+      <h2>2. Object-Oriented Design</h2>
+      <p class="section-note">
+        Organizing code so it can change: encapsulation, polymorphism, and abstraction as C# expresses them,
+        the SOLID principles as day-to-day decisions, and the design patterns that .NET itself is built
+        from. The recurring theme: depend on abstractions, prefer composition, and keep reasons-to-change
+        separated.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>Encapsulation</dt><dd>An object owns its state and exposes behavior, not fields: private data behind methods/properties, invariants enforced in one place. Access modifiers (<code>private</code>, <code>internal</code>, <code>protected</code>, <code>public</code>) are the mechanism.</dd></div>
+        <div><dt>Inheritance</dt><dd>A class extends a base class, reusing and specializing it: one base, single inheritance in C#. Models "is-a" — and couples the child to the parent's implementation decisions.</dd></div>
+        <div><dt>Polymorphism</dt><dd>Calling through a base type executes the runtime type's override: <code>shape.Area()</code> runs Circle's or Square's code. The property that lets new types plug in without editing callers.</dd></div>
+        <div><dt>Abstraction</dt><dd>Exposing what an operation does while hiding how: interfaces and abstract classes define contracts callers program against.</dd></div>
+        <div><dt>Interface</dt><dd>A contract with no state: members a type promises to implement. A class can implement many. Since C# 8 interfaces may carry default method implementations, but still no instance fields.</dd></div>
+        <div><dt>Abstract class</dt><dd>A base class that cannot be instantiated: shared state and implemented members plus abstract members children must fill in. Template for a family of types.</dd></div>
+        <div><dt>virtual / override / new</dt><dd><code>virtual</code> opts a member into dynamic dispatch; <code>override</code> replaces it in a child; <code>new</code> merely <em>hides</em> the base member — base-typed calls still get the base version (a classic bug).</dd></div>
+        <div><dt>sealed</dt><dd>Forbids further inheritance of a class (or further overriding of a member). Communicates "not designed for extension" and enables devirtualization optimizations.</dd></div>
+        <div><dt>Composition</dt><dd>Building behavior by containing and delegating to other objects ("has-a") instead of inheriting. Swappable at runtime, testable, and free of the fragile-base-class problem.</dd></div>
+        <div><dt>Coupling / cohesion</dt><dd>Coupling: how much modules know about each other (want low). Cohesion: how focused a module's responsibilities are (want high). Most principles are strategies for these two numbers.</dd></div>
+        <div><dt>SRP — Single Responsibility</dt><dd>A class should have one reason to change. A ReportGenerator that also emails and logs has three.</dd></div>
+        <div><dt>OCP — Open/Closed</dt><dd>Open for extension, closed for modification: add new behavior as new types plugging into an abstraction, not by editing a switch in existing tested code.</dd></div>
+        <div><dt>LSP — Liskov Substitution</dt><dd>Any subtype must be usable wherever the base is expected without surprises — no strengthened preconditions, weakened postconditions, or thrown NotSupportedException (the Square-extends-Rectangle trap).</dd></div>
+        <div><dt>ISP — Interface Segregation</dt><dd>Many small client-specific interfaces beat one fat one; implementers shouldn't be forced to stub members they don't support.</dd></div>
+        <div><dt>DIP — Dependency Inversion</dt><dd>High-level policy depends on abstractions, not concrete details; the concretions are supplied from outside. What makes business logic testable and infrastructure swappable.</dd></div>
+        <div><dt>Dependency injection</dt><dd>The mechanical half of DIP: dependencies arrive through the constructor instead of being new-ed up inside. A container (like .NET's built-in one) wires the object graph.</dd></div>
+        <div><dt>Design pattern</dt><dd>A named, reusable solution shape for a recurring design problem (GoF catalog: factory, strategy, observer, decorator…). Vocabulary first, code template second.</dd></div>
+        <div><dt>Immutability</dt><dd>Objects whose state never changes after construction (C#: records, init-only setters, readonly). Safe to share across threads, safe to use as dictionary keys, trivially cacheable.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>Interface vs abstract class</h3><p>Choose an interface for a capability many unrelated types can have (IDisposable, IComparable, ILogger) — it's stateless, and a class can implement several. Choose an abstract class for a genuine family sharing state and partial implementation (Stream and its subclasses). The practical tiebreaker in modern C#: dependencies you want to mock or swap should be interfaces; DI, Moq, and the whole ASP.NET ecosystem assume it. Default interface methods (C# 8+) let interfaces evolve without breaking implementers, but interfaces still cannot hold instance fields.</p></article>
+        <article class="term-card"><h3>Composition over inheritance</h3><p>Inheritance is the strongest coupling in the language: a child inherits every implementation decision, and base-class changes ripple down blindly (the fragile base class problem). Deep hierarchies also force one axis of variation — a NotificationSender with Email/Sms children can't also vary by retry policy without combinatorial subclasses. Composition keeps each axis a separate injected component: <code>new Sender(channel, retryPolicy)</code>. Rule of thumb: inherit only for true is-a with stable base contracts; otherwise contain and delegate. Notice .NET's own drift: LINQ composes operators; middleware composes handlers.</p></article>
+        <article class="term-card"><h3>SOLID as daily decisions</h3><p>SRP: if describing a class needs "and", split it. OCP: the switch statement you keep re-editing for each new case wants to become an interface with one implementation per case. LSP: if a subclass throws NotSupportedException from an inherited member, the hierarchy is wrong — the member belongs in a smaller interface (which is ISP). DIP: your OrderService should mention IPaymentGateway, never StripeClient. These aren't laws — a three-case switch that never grows is fine — they're pressure valves you open when change requests keep hitting the same code.</p></article>
+        <article class="term-card"><h3>Dependency injection in practice</h3><p>Constructor injection is the default: dependencies are visible, required, and the object is valid once constructed. The composition root (Program.cs) is the one place that knows concrete types — everything else sees interfaces. Benefits compound: tests hand in fakes/mocks without patching anything; implementations swap per environment (real gateway in prod, fake in dev). Smells: a constructor with eight dependencies is SRP failure, not DI failure; service-locator calls (<code>provider.GetService&lt;T&gt;()</code> sprinkled in logic) hide dependencies and defeat the point.</p></article>
+        <article class="term-card"><h3>Patterns you already use in .NET</h3><p>The GoF catalog is baked into the platform: events are the observer pattern; <code>IEnumerable</code>/<code>IEnumerator</code> is iterator; <code>Stream</code> wrappers (GZipStream around FileStream) are decorator; <code>Task.Factory</code> and <code>ActivatorUtilities</code> are factories; LINQ's operator chaining is a fluent builder; middleware is chain-of-responsibility; strategy is "inject a different implementation of the interface" — DI's bread and butter. Learn them as vocabulary for design conversations; reach for them when the problem shape matches, not to decorate simple code.</p></article>
+        <article class="term-card"><h3>Equality, hashing, and identity</h3><p>Reference types default to identity: <code>Equals</code>/<code>==</code> mean "same object". Value semantics must be built — override <code>Equals</code> and <code>GetHashCode</code> <em>together</em> (equal objects must hash equal, or dictionaries break), implement <code>IEquatable&lt;T&gt;</code>, overload operators — or just use a <code>record</code>, which generates all of it. Pitfalls: mutating an object while it sits in a HashSet strands it in the wrong bucket (another argument for immutable keys); string's <code>==</code> is overloaded to compare content, teaching beginners the wrong default for every other class.</p></article>
+      </div>
+
+      <p class="diagram-title">virtual/override vs new — which method actually runs</p>
+      <pre class="diagram">class Animal  { public virtual string Speak() =&gt; "..."; }
+class Dog     : Animal { public override string Speak() =&gt; "Woof"; }
+class Cat     : Animal { public new      string Speak() =&gt; "Meow"; }
+
+Animal a1 = new Dog();  a1.Speak();  // "Woof"  — override: runtime type wins
+Animal a2 = new Cat();  a2.Speak();  // "..."   — new: compile-time type wins!
+Cat    c  = new Cat();  c.Speak();   // "Meow"  — only direct Cat refs see it
+
+dispatch:  virtual+override → look up in the object's actual type (v-table)
+           new              → two unrelated methods sharing a name (hiding)
+the compiler warns on accidental hiding — heed CS0108</pre>
+
+      <p class="diagram-title">Dependency inversion — who points at whom</p>
+      <pre class="diagram">WITHOUT DIP:  high-level depends on detail        WITH DIP:  both depend on abstraction
+
+  OrderService ───▶ StripeClient                    OrderService ───▶ IPaymentGateway
+  (edits ripple up from payment                                          ▲
+   details; untestable without                                           │ implements
+   hitting Stripe)                                              StripeGateway , FakeGateway
+
+composition root (Program.cs) does the wiring:
+  services.AddScoped&lt;IPaymentGateway, StripeGateway&gt;();
+  services.AddScoped&lt;OrderService&gt;();          // ctor gets the gateway injected
+tests just do:  new OrderService(new FakeGateway())   — no container needed</pre>
+
+      <p class="diagram-title">Strategy via composition — one axis per component</p>
+      <pre class="diagram">inheritance explosion:                      composition:
+
+        NotificationSender                    NotificationSender(IChannel c,
+        /        |        \                                      IRetryPolicy r)
+  EmailSender SmsSender PushSender              │ has-a         │ has-a
+      |          |          |                   ▼               ▼
+  EmailWith  SmsWith    PushWith            IChannel:        IRetryPolicy:
+  RetrySender RetrySender RetrySender         Email, Sms,      NoRetry,
+      ...combinatorial growth...              Push             Exponential
+
+adding a channel = 1 new class implementing IChannel — sender code untouched
+adding a policy  = 1 new class implementing IRetryPolicy — channels untouched</pre>
+
+      <div class="link-list">
+        <a href="https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/object-oriented/" target="_blank" rel="noopener">Object-oriented programming in C# — Microsoft Learn</a>
+        <a href="https://learn.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/architectural-principles" target="_blank" rel="noopener">Architectural principles (SOLID and friends) — .NET docs</a>
+        <a href="https://refactoring.guru/design-patterns/csharp" target="_blank" rel="noopener">Design patterns in C# — Refactoring.Guru</a>
+        <a href="https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection" target="_blank" rel="noopener">Dependency injection in .NET</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-ood">Section score: 0 / 0</span>
+      <div class="quiz" data-section="ood"></div>
+    </section>
+
+    <!-- ================= 3. APPLICATION ARCHITECTURE, FRAMEWORKS & TOOLS ================= -->
+    <section id="arch" class="section">
+      <h2>3. Application Architecture, Frameworks &amp; Tools</h2>
+      <p class="section-note">
+        Assembling real applications: the ASP.NET Core request pipeline and its DI container, EF Core and
+        its pitfalls, how solutions are layered so business logic survives framework churn, and the everyday
+        toolchain — dotnet CLI, NuGet, xUnit/Moq, configuration, logging, and deployment.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>.NET SDK / runtime</dt><dd>The SDK builds (compilers, <code>dotnet</code> CLI, MSBuild, templates); the runtime only runs. Servers need the runtime (or a self-contained publish); dev machines need the SDK.</dd></div>
+        <div><dt>dotnet CLI</dt><dd>The front door to everything: <code>dotnet new/build/run/test/add package/publish</code>. IDEs drive the same MSBuild underneath — CI scripts use the CLI directly.</dd></div>
+        <div><dt>csproj / MSBuild</dt><dd>The project file: target framework, package references, build settings. SDK-style projects are a few lines and glob source files automatically.</dd></div>
+        <div><dt>NuGet</dt><dd>The .NET package ecosystem: versioned assemblies with transitive dependency resolution, restored at build. Your own libraries ship the same way (<code>dotnet pack</code>).</dd></div>
+        <div><dt>ASP.NET Core</dt><dd>The web framework: one stack for APIs, MVC sites, Razor pages, gRPC, SignalR. Cross-platform, DI-native, built around a middleware pipeline hosted by Kestrel.</dd></div>
+        <div><dt>Middleware</dt><dd>Components chained on every request: each can act, call the next, and act again on the way back (logging, auth, routing, error handling). Order of registration = order of execution.</dd></div>
+        <div><dt>Minimal APIs / controllers</dt><dd>Two dialects for endpoints: <code>app.MapGet("/users/{id}", ...)</code> lambdas, or controller classes with attribute routing. Same pipeline, same DI, same model binding underneath.</dd></div>
+        <div><dt>Model binding / validation</dt><dd>The framework materializes route values, query strings, and JSON bodies into typed parameters/DTOs, then runs validation attributes before your code runs.</dd></div>
+        <div><dt>DI lifetimes</dt><dd>Singleton: one instance forever. Scoped: one per request. Transient: new every resolve. The container also disposes what it creates at scope end.</dd></div>
+        <div><dt>EF Core</dt><dd>The object-relational mapper: LINQ queries become SQL, rows become tracked entities, <code>SaveChanges</code> turns your object edits into INSERT/UPDATE/DELETE.</dd></div>
+        <div><dt>DbContext</dt><dd>A unit of work: short-lived, not thread-safe, registered scoped. Tracks loaded entities' changes until SaveChanges.</dd></div>
+        <div><dt>Migration</dt><dd>Versioned schema change generated from model diffs (<code>dotnet ef migrations add</code>), applied in order to evolve the database with the code.</dd></div>
+        <div><dt>IConfiguration / IOptions&lt;T&gt;</dt><dd>Layered config: appsettings.json ← per-environment json ← environment variables ← user-secrets, later wins. IOptions binds a section to a typed class.</dd></div>
+        <div><dt>ILogger&lt;T&gt;</dt><dd>Structured logging abstraction: message templates with named placeholders (<code>"Order {OrderId} failed"</code>) flow to console, Serilog, Application Insights, etc.</dd></div>
+        <div><dt>xUnit</dt><dd>The de-facto test framework: <code>[Fact]</code> for single cases, <code>[Theory]</code>+<code>[InlineData]</code> for parameterized ones, constructor/IDisposable for setup/teardown.</dd></div>
+        <div><dt>Moq / test doubles</dt><dd>Mock library: <code>new Mock&lt;IPaymentGateway&gt;()</code>, <code>Setup(...)</code> canned answers, <code>Verify(...)</code> interaction checks — possible because dependencies are interfaces.</dd></div>
+        <div><dt>WebApplicationFactory</dt><dd>Boots the real app in-memory for integration tests: real pipeline, real DI, real routing — with test-overridden services (e.g. in-memory DB) and an HttpClient.</dd></div>
+        <div><dt>BackgroundService</dt><dd>Base class for long-running hosted work (queue consumers, schedulers) living inside the app's host with DI and graceful-shutdown cancellation.</dd></div>
+        <div><dt>HttpClientFactory</dt><dd><code>AddHttpClient</code> — pools handlers to avoid the classic socket-exhaustion bug (new HttpClient per request) and DNS staleness (one static client forever).</dd></div>
+        <div><dt>Layered / clean architecture</dt><dd>Domain at the center, application services around it, infrastructure (DB, HTTP, framework) at the edge; dependencies point inward via interfaces the inner layers own.</dd></div>
+        <div><dt>Repository / unit of work</dt><dd>Abstraction over persistence so domain logic doesn't reference EF Core directly. (Note: DbContext itself already is a repository+UoW — extra layers should earn their keep.)</dd></div>
+        <div><dt>CQRS</dt><dd>Separate models for writes (commands, rich domain rules) and reads (queries, shaped DTOs straight from SQL). Often via MediatR handlers; full event-sourced CQRS is a much bigger commitment.</dd></div>
+        <div><dt>System.Text.Json</dt><dd>The built-in JSON (de)serializer: fast, Span-based, source-generatable. Newtonsoft.Json remains common in older code and for exotic scenarios.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>The request pipeline is the app</h3><p>An ASP.NET Core app is a stack of middleware ending at an endpoint. Each request walks down the stack and back up — so order matters enormously: exception handling first (to catch everything below), then HTTPS/HSTS, static files, routing, CORS, authentication <em>before</em> authorization, then endpoints. Auth after routing but before your handler is why <code>[Authorize]</code> works. Cross-cutting concerns (rate limiting, tenant resolution, request logging) belong here, written once, instead of sprinkled through controllers.</p></article>
+        <article class="term-card"><h3>DI lifetimes and the captive dependency</h3><p>Scoped services (DbContext!) exist once per request; singletons live for the process. The deadly combination: a singleton that takes a scoped service in its constructor <em>captures</em> it — the "per-request" object silently becomes per-process, shared across concurrent requests (DbContext is not thread-safe; this produces corrupt tracking and heisenbugs). The container throws for this in development thanks to scope validation. When a singleton genuinely needs scoped work, it creates a scope: <code>using var scope = scopeFactory.CreateScope()</code> — the standard pattern inside BackgroundService loops.</p></article>
+        <article class="term-card"><h3>EF Core without footguns</h3><p>EF Core translates LINQ to SQL — when it can. The classics: the N+1 query (loop over orders touching <code>order.Customer</code> lazily = 1+N round trips; fix with <code>Include</code> or projection), forgetting <code>AsNoTracking()</code> on read-only queries (change tracking costs memory and time), filtering in memory because a <code>.Where</code> came after <code>.AsEnumerable()</code>, and long-lived contexts accumulating tracked entities. Prefer projections (<code>Select(o =&gt; new OrderSummary(...)</code>) that fetch only needed columns. Migrations keep schema in git; apply them by script/CI in production rather than auto-migrate on boot.</p></article>
+        <article class="term-card"><h3>Layering that survives frameworks</h3><p>The point of clean/onion layering is that business rules outlive infrastructure choices: the domain project references nothing; the application layer defines ports (IOrderRepository, IEmailSender) it needs; infrastructure implements them with EF/SMTP/HTTP; the web project is just an adapter calling application services. Dependencies point inward only — enforced by project references, so the compiler polices the architecture. Payoffs: unit tests cover rules with no database; swapping Postgres for Cosmos touches one project. Cost: indirection — a CRUD app may honestly not need more than controllers + DbContext.</p></article>
+        <article class="term-card"><h3>A testing pyramid that works in .NET</h3><p>Base: fast xUnit unit tests of domain and application logic with Moq fakes at the ports — thousands, milliseconds each. Middle: integration tests with WebApplicationFactory hitting real routing/DI/serialization, database via Testcontainers or SQLite-in-memory. Tip: a few end-to-end smoke tests. Design feedback is the hidden value: code that is hard to test (statics, <code>new</code>-ed dependencies, DateTime.Now inline) is coupled code — inject a clock (<code>TimeProvider</code>), inject the gateway. <code>dotnet test</code> runs it all in CI on every push.</p></article>
+        <article class="term-card"><h3>Config, logging, deployment</h3><p>Configuration layers so the same binary runs everywhere: appsettings.json defaults, appsettings.Production.json overrides, environment variables on the host, secrets in user-secrets (dev) or a vault (prod) — never in git. Structured logging with message templates makes logs queryable ({OrderId} becomes an indexed field, not string soup). Deployment: <code>dotnet publish</code> framework-dependent (small, needs runtime installed) or self-contained/AOT (bigger, zero prerequisites); containers standardize the rest. Health-check endpoints + graceful shutdown (host cancels BackgroundService tokens) complete the production story.</p></article>
+      </div>
+
+      <p class="diagram-title">ASP.NET Core middleware pipeline — down and back up</p>
+      <pre class="diagram">request ─▶ ExceptionHandler ─▶ HTTPS ─▶ StaticFiles ─▶ Routing ─▶ AuthN ─▶ AuthZ ─▶ Endpoint
+               │                            │ (file hit?                              (controller/
+               │                            │  short-circuit,                          minimal API
+               │                            ◀── respond)                               handler)
+response ◀── formats error ◀───────────────────────────────────────────────────── returns result
+
+each middleware:   async (context, next) =&gt; {
+                       // before: runs on the way DOWN
+                       await next(context);
+                       // after:  runs on the way BACK UP (reverse order)
+                   }
+order of app.Use...() = order on the way down.  Exception handler is FIRST
+so its try/catch wraps everything after it.  AuthN before AuthZ — you must
+know who the user is before asking what they may do.</pre>
+
+      <p class="diagram-title">DI lifetimes — one request vs the process</p>
+      <pre class="diagram">                 process lifetime ────────────────────────────────▶
+singleton:       [════════════ one instance for the whole app ════════════]
+                     request 1              request 2 (concurrent!)
+scoped:              [── instance A ──]     [── instance B ──]      one per request
+transient:           [x] [x]  [x]           [x]  [x]                new every resolve
+
+CAPTIVE DEPENDENCY (bug):
+  singleton ctor takes scoped DbContext ──▶ context A trapped inside the
+  singleton forever ──▶ request 2 also uses context A ──▶ two threads, one
+  non-thread-safe context ──▶ corrupt change tracking, random crashes
+fix: inject IServiceScopeFactory and create a scope per operation</pre>
+
+      <p class="diagram-title">Clean architecture — dependencies point inward</p>
+      <pre class="diagram">┌────────────────────────────────────────────────────────────┐
+│  Web / API        controllers, minimal APIs, filters      │  adapters
+│   ┌────────────────────────────────────────────────────┐   │
+│   │  Infrastructure   EF Core, SMTP, HTTP clients      │   │  implements ports
+│   │   ┌────────────────────────────────────────────┐   │   │
+│   │   │  Application   use cases, defines ports:   │   │   │  orchestration
+│   │   │                IOrderRepository, IClock    │   │   │
+│   │   │   ┌────────────────────────────────────┐   │   │   │
+│   │   │   │  Domain    entities, value objects,│   │   │   │  pure rules,
+│   │   │   │            invariants — refs NOTHING│  │   │   │  no framework
+│   │   │   └────────────────────────────────────┘   │   │   │
+│   │   └────────────────────────────────────────────┘   │   │
+│   └────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────┘
+project references = arrows pointing IN. Infrastructure references
+Application to implement its interfaces; Domain compiles alone.
+Tests: domain/application test with fakes — no DB, no web server.</pre>
+
+      <p class="diagram-title">EF Core N+1 — the query you didn't know you wrote</p>
+      <pre class="diagram">var orders = db.Orders.ToList();              // SELECT * FROM Orders     (1 query)
+foreach (var o in orders)
+    Console.WriteLine(o.Customer.Name);       // SELECT ... WHERE Id = @p (N queries!)
+
+100 orders = 101 round trips.  fixes:
+
+eager load:   db.Orders.Include(o =&gt; o.Customer).ToList();          // 1 JOIN query
+projection:   db.Orders.Select(o =&gt; new { o.Id, o.Customer.Name })  // 1 query,
+                        .ToList();                                   // only 2 columns
+
+projection also skips change tracking — ideal for read endpoints.
+watch the logs: EF logs every SQL statement it sends (EnableSensitiveDataLogging
+in dev) — the N+1 is obvious the moment you look.</pre>
+
+      <div class="link-list">
+        <a href="https://learn.microsoft.com/en-us/aspnet/core/" target="_blank" rel="noopener">ASP.NET Core documentation</a>
+        <a href="https://learn.microsoft.com/en-us/ef/core/" target="_blank" rel="noopener">EF Core documentation</a>
+        <a href="https://learn.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/" target="_blank" rel="noopener">Architect modern web apps with ASP.NET Core (free e-book)</a>
+        <a href="https://learn.microsoft.com/en-us/dotnet/core/testing/" target="_blank" rel="noopener">Testing in .NET</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-arch">Section score: 0 / 0</span>
+      <div class="quiz" data-section="arch"></div>
+    </section>
+
+    <!-- ================= RESOURCES ================= -->
+    <section id="resources" class="section">
+      <h2>Further Study</h2>
+      <div class="source-grid">
+        <article class="term-card">
+          <h3>Books</h3>
+          <p>"C# in Depth" (Jon Skeet) for language mechanics; "CLR via C#" (Richter) for the runtime; "Dependency Injection Principles, Practices, and Patterns" (Seemann) for design; "Architecting Modern Web Applications" (free Microsoft e-book) for the big picture.</p>
+        </article>
+        <article class="term-card">
+          <h3>Hands-on drills</h3>
+          <p>Build a small API end to end: minimal API + EF Core + migrations + xUnit/WebApplicationFactory tests. Then break it on purpose: introduce a captive dependency, an N+1, a sync-over-async deadlock — and watch how each one presents.</p>
+        </article>
+        <article class="term-card">
+          <h3>Reference sites</h3>
+          <p>Microsoft Learn is canonical and current. sharplab.io shows the compiler's lowered output (see what async/await and closures really become); .NET source is browsable at source.dot.net.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Last updated: 2026-07-04. Styles shared with the Isaac Sim study hub.</p>
+  </footer>
+
+<script src="quiz-data.js"></script>
+<script>
+const state = {};
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function totals() {
+  let answered = 0, correct = 0, total = 0;
+  for (const key of Object.keys(state)) {
+    answered += state[key].answered;
+    correct += state[key].correct;
+    total += state[key].total;
+  }
+  return { answered, correct, total };
+}
+
+function updateScore() {
+  const t = totals();
+  document.getElementById("score-text").textContent = `Score: ${t.correct} / ${t.answered}`;
+  document.getElementById("score-note").textContent =
+    t.answered === t.total
+      ? `Done! ${t.correct} of ${t.total} correct (${Math.round(100 * t.correct / t.total)}%). Retry to reshuffle questions and options.`
+      : `${t.total - t.answered} of ${t.total} questions remaining across 3 sections.`;
+  for (const key of Object.keys(state)) {
+    const s = state[key];
+    const elScore = document.getElementById(`sec-score-${key}`);
+    if (elScore) {
+      elScore.textContent = s.answered === s.total
+        ? `Section score: ${s.correct} / ${s.total} (${Math.round(100 * s.correct / s.total)}%)`
+        : `Section score: ${s.correct} / ${s.answered} — ${s.total - s.answered} left`;
+    }
+  }
+}
+
+function renderQuestion(container, item, number, sectionKey) {
+  const card = el("article", "quiz-card");
+  card.appendChild(el("p", "q", `Q${number}. ${item.q}`));
+  const optionsBox = el("div", "options");
+  const explain = el("div", "explain");
+  explain.appendChild(document.createTextNode(item.explain));
+
+  const buttons = [];
+  for (const [text, isCorrect] of shuffle(item.options)) {
+    const btn = el("button", "", text);
+    btn.type = "button";
+    btn.dataset.correct = isCorrect ? "1" : "0";
+    btn.addEventListener("click", () => {
+      state[sectionKey].answered += 1;
+      if (isCorrect) state[sectionKey].correct += 1;
+      for (const b of buttons) {
+        b.disabled = true;
+        if (b.dataset.correct === "1") b.classList.add("correct");
+      }
+      if (!isCorrect) btn.classList.add("incorrect");
+      const verdict = el("span", "verdict " + (isCorrect ? "good" : "bad"), isCorrect ? "Correct. " : "Incorrect. ");
+      explain.insertBefore(verdict, explain.firstChild);
+      explain.classList.add("show");
+      updateScore();
+    });
+    buttons.push(btn);
+    optionsBox.appendChild(btn);
+  }
+
+  card.appendChild(optionsBox);
+  card.appendChild(explain);
+  container.appendChild(card);
+}
+
+function renderAll() {
+  for (const quizBox of document.querySelectorAll(".quiz")) {
+    const key = quizBox.dataset.section;
+    state[key] = { answered: 0, correct: 0, total: 0 };
+    quizBox.innerHTML = "";
+    const items = shuffle(quizData[key]);
+    items.forEach((item, i) => {
+      state[key].total += 1;
+      renderQuestion(quizBox, item, i + 1, key);
+    });
+  }
+  updateScore();
+}
+
+const toggleBtn = document.getElementById("toggle-explain");
+toggleBtn.addEventListener("click", () => {
+  const on = document.getElementById("main").classList.toggle("show-all");
+  toggleBtn.textContent = on ? "Hide explanations" : "Show all explanations";
+});
+
+document.getElementById("retry").addEventListener("click", renderAll);
+renderAll();
+</script>
+</body>
+</html>
