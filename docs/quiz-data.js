@@ -221,6 +221,54 @@ const quizData = {
         ["Compression of large arrays; it only works on byte[]", false]
       ],
       explain: "Substring, array slicing, and parsing traditionally allocate copies; Span<T> is a (pointer, length) view — slicing is arithmetic, not allocation, and one parsing routine handles arrays, stackalloc, and native buffers. Being a ref struct keeps it safely on the stack, so it cannot be boxed, stored in a field of a class, or cross an await — use Memory<T> for those cases."
+    },
+    {
+      type: "multi",
+      q: "You are fixing a codebase riddled with async bugs. Which changes actually improve it?",
+      options: [
+        ["Replace task.Result / task.Wait() with await, making callers async all the way up", true],
+        ["Start independent tasks first, then await Task.WhenAll to run them concurrently", true],
+        ["Change 'async void' methods to 'async Task' everywhere except event handlers", true],
+        ["Wrap every awaited I/O call in Task.Run so it runs on a background thread", false],
+        ["Add the async modifier to methods so their awaits run in parallel automatically", false]
+      ],
+      explain: "The three real fixes: .Result blocks a thread and deadlocks under a synchronization context; sequential awaits serialize independent work that WhenAll overlaps; async void hides exceptions and can't be awaited (event handlers are the one sanctioned use). The two fakes: Task.Run around already-asynchronous I/O just burns a thread-pool thread to wait, and the async keyword alone changes nothing about concurrency — awaits inside are still sequential."
+    },
+    {
+      type: "multi",
+      q: "A hot parsing loop is causing heavy GC pressure. Which changes genuinely reduce allocations?",
+      options: [
+        ["Slice the input with Span<T> / ReadOnlySpan<char> instead of Substring", true],
+        ["Accumulate output in a reused StringBuilder instead of string +=", true],
+        ["Rent large temporary buffers from ArrayPool<T>.Shared instead of new-ing them", true],
+        ["Call GC.Collect() at the end of each iteration", false],
+        ["Rewrite the loop body as a chain of LINQ operators with lambdas", false]
+      ],
+      explain: "Span slicing is pointer arithmetic (zero allocations where Substring copies), StringBuilder reuses one growing buffer, and ArrayPool recycles big arrays that would otherwise churn the LOH. GC.Collect() doesn't remove allocations — it adds forced pauses on top of them. LINQ chains typically add allocations (enumerators, closures, intermediate sequences), which is why hot paths often unroll them into plain loops."
+    },
+    {
+      type: "order",
+      q: "Arrange the life of a C# method, from source code to optimized native execution.",
+      steps: [
+        "Roslyn compiles the C# source to IL + metadata in an assembly",
+        "The CLR loads the assembly when the app runs",
+        "On the method's first call, the JIT compiles its IL to native code (tier 0)",
+        "The method proves hot, so tiered compilation recompiles it optimized (tier 1)",
+        "Subsequent calls run the optimized native code directly"
+      ],
+      explain: "Compilation happens twice, at different times: Roslyn to portable IL at build, JIT to machine code at run time — which is how one assembly runs on x64 and ARM alike. Tiering resolves the JIT's dilemma (compile fast vs compile well) by doing both: cheap code immediately, optimized code only for methods that earn it."
+    },
+    {
+      type: "order",
+      q: "An async method awaits an HTTP call that takes 200 ms. Put the events in the order they happen.",
+      steps: [
+        "The caller invokes the method; code runs synchronously until the first await",
+        "The awaited task is incomplete, so the method suspends and returns a pending Task to the caller",
+        "The calling thread is free and does other work while the request is in flight",
+        "The response arrives; the continuation is scheduled on the thread pool",
+        "The rest of the method runs and completes the Task the caller is awaiting"
+      ],
+      explain: "This is the compiler-generated state machine in motion: synchronous prologue, suspension at the incomplete await (return, not block), continuation on completion. The key scalability fact is step 3 — no thread waits out the 200 ms, which is why an async server holds thousands of in-flight requests with a small thread pool."
     }
   ],
 
@@ -404,6 +452,54 @@ const quizData = {
         ["Too much testing — inline the dependencies with 'new' to simplify", false]
       ],
       explain: "Constructor injection makes coupling visible — that's a feature. Eight dependencies means eight reasons to change; hiding them (locator, property injection, a god 'context' object) removes the symptom and keeps the disease. Look for clusters that form a missing concept (three params about pricing → PricingEngine) or responsibilities to split. The constructor is the smoke alarm; don't unplug it."
+    },
+    {
+      type: "multi",
+      q: "Which of these code-review findings are genuine SOLID violations?",
+      options: [
+        ["A ReportService that generates, saves to disk, and emails reports — three reasons to change", true],
+        ["A subclass that throws NotSupportedException from an inherited interface member", true],
+        ["OrderService constructing StripeClient with 'new' inside its business logic", true],
+        ["A class implementing four small role interfaces (IPrinter, IScanner…)", false],
+        ["A three-case switch over an enum that has not changed in years", false]
+      ],
+      explain: "The first three map to SRP (multiple responsibilities), LSP (the subtype breaks the base contract — usually an ISP smell too), and DIP (high-level policy bound to a concrete detail). Implementing several small interfaces is what ISP recommends, not a violation. And a stable, small switch is fine — OCP pressure applies to conditionals that keep growing, not to every branch statement."
+    },
+    {
+      type: "multi",
+      q: "A pricing algorithm must be swappable at runtime (per customer tier) and unit-testable without infrastructure. Which design choices support that?",
+      options: [
+        ["Define an IPricingStrategy interface owned by the business layer", true],
+        ["Inject the strategy through the consumer's constructor", true],
+        ["Implement one strategy class per tier and choose by key at resolution time", true],
+        ["Implement pricing as a static utility class for easy calling", false],
+        ["Resolve the strategy with provider.GetService<T>() inside the pricing method", false]
+      ],
+      explain: "Interface + constructor injection + one implementation per variant is the strategy pattern on DI rails: consumers stay ignorant of which algorithm runs, tests pass a fake, and adding a tier is a new class (OCP). Statics are the opposite — un-swappable, un-mockable, hidden coupling. Service-locator calls do technically swap, but they hide the dependency and couple logic to the container, failing at use-time instead of composition-time."
+    },
+    {
+      type: "order",
+      q: "A payment switch statement grows a new case per provider. Arrange the refactor to strategy (Open/Closed) in the right order.",
+      steps: [
+        "Define an IPaymentProvider interface capturing what every case does",
+        "Move each case body into its own class implementing the interface",
+        "Register the implementations in the DI container, keyed by provider",
+        "Change the consumer to resolve and call the right implementation instead of switching",
+        "Delete the switch — new providers are now new classes only"
+      ],
+      explain: "The contract comes first because it is discovered from the switch: the shared shape of all cases. Then behavior moves case by case (each step compilable and testable), wiring happens at the composition root, and the conditional disappears last. After this, adding Klarna touches zero existing lines — the definition of open for extension, closed for modification."
+    },
+    {
+      type: "order",
+      q: "OrderService calls the Stripe SDK directly and cannot be unit-tested. Arrange the dependency-inversion refactor.",
+      steps: [
+        "Define IPaymentGateway in the application layer, expressing only what OrderService needs",
+        "Change OrderService to receive IPaymentGateway through its constructor",
+        "Write StripeGateway in the infrastructure layer, adapting the SDK to the interface",
+        "Register the adapter in the composition root (services.AddScoped<IPaymentGateway, StripeGateway>())",
+        "Unit-test OrderService with a FakeGateway — no network, no Stripe account"
+      ],
+      explain: "The port is defined by the consumer's needs (ChargeAsync, RefundAsync), not by Stripe's API surface — that's what makes it an inversion: the detail adapts to the policy. Constructor injection swaps the hard-wired dependency, the adapter quarantines the SDK at the edge, one line of wiring connects them, and the payoff lands in step 5: business logic testable in milliseconds."
     }
   ],
 
@@ -627,6 +723,55 @@ const quizData = {
         ["A SQL Server replication feature", false]
       ],
       explain: "Reads and writes want different things: writes need invariants and rich domain objects; reads want flat, fast projections of exactly what the screen shows. Everyday CQRS is just two paths — command handlers using the domain model, query handlers using projections or Dapper — often organized with MediatR. Full CQRS with separate stores and event sourcing is a serious escalation; adopt it for the specific aggregate that needs it, not by default."
+    },
+    {
+      type: "multi",
+      q: "Which statements about ASP.NET Core middleware ordering are true?",
+      options: [
+        ["The exception handler goes first so its try/catch wraps everything registered after it", true],
+        ["UseAuthentication must run before UseAuthorization — identity before permissions", true],
+        ["UseStaticFiles sits early so file hits short-circuit the expensive rest of the pipeline", true],
+        ["Registration order is irrelevant — the framework sorts middleware by dependency", false],
+        ["UseRouting should come after UseAuthorization so auth runs on every request", false]
+      ],
+      explain: "The pipeline runs in exact registration order, nested like an onion — nothing is sorted for you. Exception handling must be outermost to catch below; AuthN populates the user AuthZ evaluates; static files short-circuit cheaply. Routing must come BEFORE authorization, not after: authorization reads the matched endpoint's metadata ([Authorize] attributes) to know which policy to apply — with routing later, it has nothing to evaluate against."
+    },
+    {
+      type: "multi",
+      q: "Which of these DI usages are safe, given singleton/scoped/transient rules?",
+      options: [
+        ["Injecting a scoped DbContext into a scoped application service", true],
+        ["A singleton that injects IServiceScopeFactory and creates a scope per operation", true],
+        ["Injecting a transient validator into a scoped service", true],
+        ["Injecting a scoped DbContext into a singleton's constructor", false],
+        ["Caching per-request user data in a singleton's instance field", false]
+      ],
+      explain: "The rule: a service may depend on services with equal or longer lifetimes. Scoped-into-scoped and transient-into-scoped satisfy it; the scope-factory pattern is the sanctioned way for singletons to reach scoped services (fresh scope, then dispose). Scoped-into-singleton is the captive dependency — a 'per-request' DbContext silently shared across all requests and threads. Per-request state in a singleton field is the same disease without the container: cross-request data bleed."
+    },
+    {
+      type: "order",
+      q: "Your entity model changed. Arrange the EF Core migration workflow from code change to updated production schema.",
+      steps: [
+        "Modify the entity classes / DbContext model in C#",
+        "Run 'dotnet ef migrations add' — EF diffs the model against the last snapshot and scaffolds Up/Down code",
+        "Review (and if needed edit) the generated migration before committing it",
+        "Generate an idempotent SQL script or apply the migration to the target database in CI/CD",
+        "EF records the migration in the __EFMigrationsHistory table so it is never re-applied"
+      ],
+      explain: "Code changes first; the tooling derives the schema delta from the model diff, not from the database. The review step matters because scaffolding can't know intent — a rename may scaffold as drop-column + add-column, destroying data. Production application belongs to a script or pipeline rather than auto-migrate-on-boot, and the history table is what makes the whole scheme idempotent per environment."
+    },
+    {
+      type: "order",
+      q: "Trace an HTTP request through an ASP.NET Core API, from socket to response.",
+      steps: [
+        "Kestrel accepts the connection and builds the HttpContext",
+        "The request descends the middleware pipeline (exception handler, static files, CORS…)",
+        "UseRouting matches the URL to an endpoint and attaches its metadata",
+        "Authentication builds the user principal, then authorization checks it against the endpoint's policy",
+        "Model binding materializes parameters and the handler executes, producing a result",
+        "The response travels back up the middleware chain and is written to the socket"
+      ],
+      explain: "The ordering encodes the framework's design: routing must precede auth because authorization needs the matched endpoint's [Authorize] metadata; binding and validation run just before your handler so it receives typed, checked inputs; and every middleware gets a second chance at the response on the way back out — where response headers, compression, and logging happen."
     }
   ]
 };

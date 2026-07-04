@@ -39,6 +39,13 @@
     .verdict { font-weight:700; }
     .verdict.good { color:var(--accent-strong); }
     .verdict.bad { color:var(--warn); }
+    .options button.selected { border-color:var(--accent); background:var(--accent-soft); }
+    .options button .step-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; margin-right:9px; border-radius:999px; background:var(--accent); color:#ffffff; font-size:12px; font-weight:700; flex:none; }
+    .options button.step-btn { display:flex; align-items:flex-start; }
+    .check-btn { margin-top:10px; min-height:36px; border:1px solid var(--accent); border-radius:6px; padding:6px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .check-btn:hover:enabled { background:var(--accent-strong); border-color:var(--accent-strong); }
+    .check-btn:disabled { opacity:0.5; cursor:default; }
+    .qtype-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--warn-soft); color:var(--warn); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
     .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
     .bar-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
     .bar-btn.secondary { background:var(--panel); color:var(--text); border-color:var(--line); }
@@ -70,8 +77,9 @@
         areas: the C# language and .NET runtime, object-oriented design, and application architecture with
         the common frameworks and tools. Each section has a definitions list, core-concept cards with
         tradeoffs and pitfalls, ASCII diagrams and code walkthroughs where a picture helps, further-reading
-        links, and a bank of multiple-choice questions with explanations. Difficulty runs from recall up to
-        applied reasoning.
+        links, and a bank of practice questions with explanations in three formats: classic single-answer,
+        select-all-that-apply (the whole set must match), and click-the-steps-in-order design chains.
+        Difficulty runs from recall up to applied reasoning.
       </p>
     </section>
 
@@ -494,6 +502,8 @@ function updateScore() {
 }
 
 function renderQuestion(container, item, number, sectionKey) {
+  if (item.type === "multi") return renderMulti(container, item, number, sectionKey);
+  if (item.type === "order") return renderOrder(container, item, number, sectionKey);
   const card = el("article", "quiz-card");
   card.appendChild(el("p", "q", `Q${number}. ${item.q}`));
   const optionsBox = el("div", "options");
@@ -523,6 +533,116 @@ function renderQuestion(container, item, number, sectionKey) {
   }
 
   card.appendChild(optionsBox);
+  card.appendChild(explain);
+  container.appendChild(card);
+}
+
+function renderMulti(container, item, number, sectionKey) {
+  const card = el("article", "quiz-card");
+  const title = el("p", "q", `Q${number}. ${item.q}`);
+  title.appendChild(el("span", "qtype-tag", "select ALL that apply"));
+  card.appendChild(title);
+  const optionsBox = el("div", "options");
+  const explain = el("div", "explain");
+  explain.appendChild(document.createTextNode(item.explain));
+
+  const buttons = [];
+  for (const [text, isCorrect] of shuffle(item.options)) {
+    const btn = el("button", "", text);
+    btn.type = "button";
+    btn.dataset.correct = isCorrect ? "1" : "0";
+    btn.addEventListener("click", () => btn.classList.toggle("selected"));
+    buttons.push(btn);
+    optionsBox.appendChild(btn);
+  }
+
+  const check = el("button", "check-btn", "Check answer");
+  check.type = "button";
+  check.addEventListener("click", () => {
+    state[sectionKey].answered += 1;
+    let ok = true;
+    for (const b of buttons) {
+      const good = b.dataset.correct === "1";
+      const picked = b.classList.contains("selected");
+      if (good !== picked) ok = false;
+      b.disabled = true;
+      if (good) b.classList.add("correct");
+      else if (picked) b.classList.add("incorrect");
+    }
+    if (ok) state[sectionKey].correct += 1;
+    check.disabled = true;
+    const verdict = el("span", "verdict " + (ok ? "good" : "bad"),
+      ok ? "Correct — exact set matched. " : "Incorrect — the full correct set is highlighted green. ");
+    explain.insertBefore(verdict, explain.firstChild);
+    explain.classList.add("show");
+    updateScore();
+  });
+
+  card.appendChild(optionsBox);
+  card.appendChild(check);
+  card.appendChild(explain);
+  container.appendChild(card);
+}
+
+function renderOrder(container, item, number, sectionKey) {
+  const card = el("article", "quiz-card");
+  const title = el("p", "q", `Q${number}. ${item.q}`);
+  title.appendChild(el("span", "qtype-tag", "click the steps in order"));
+  card.appendChild(title);
+  const optionsBox = el("div", "options");
+  const explain = el("div", "explain");
+  explain.appendChild(document.createTextNode(
+    item.explain + " Correct order: " + item.steps.map((s, i) => `(${i + 1}) ${s}`).join(" → ") + "."));
+
+  const seq = [];
+  const check = el("button", "check-btn", "Check order");
+  check.type = "button";
+  check.disabled = true;
+
+  const buttons = shuffle(item.steps.map((text, idx) => ({ text, idx }))).map(step => {
+    const btn = el("button", "step-btn");
+    btn.type = "button";
+    const badge = el("span", "step-badge", "");
+    badge.style.visibility = "hidden";
+    btn.appendChild(badge);
+    btn.appendChild(el("span", "", step.text));
+    btn.dataset.idx = String(step.idx);
+    btn.addEventListener("click", () => {
+      const pos = seq.indexOf(btn);
+      if (pos >= 0) seq.splice(pos, 1); else seq.push(btn);
+      for (const b of buttons) {
+        const p = seq.indexOf(b);
+        const bd = b.querySelector(".step-badge");
+        bd.textContent = p >= 0 ? String(p + 1) : "";
+        bd.style.visibility = p >= 0 ? "visible" : "hidden";
+        b.classList.toggle("selected", p >= 0);
+      }
+      check.disabled = seq.length !== buttons.length;
+    });
+    optionsBox.appendChild(btn);
+    return btn;
+  });
+
+  check.addEventListener("click", () => {
+    state[sectionKey].answered += 1;
+    let ok = true;
+    seq.forEach((btn, pos) => {
+      const right = Number(btn.dataset.idx) === pos;
+      if (!right) ok = false;
+      btn.classList.add(right ? "correct" : "incorrect");
+    });
+    for (const b of buttons) b.disabled = true;
+    if (ok) state[sectionKey].correct += 1;
+    check.disabled = true;
+    const verdict = el("span", "verdict " + (ok ? "good" : "bad"),
+      ok ? "Correct sequence. " : "Wrong sequence — green steps were in the right position, amber ones were not. ");
+    explain.insertBefore(verdict, explain.firstChild);
+    explain.classList.add("show");
+    updateScore();
+  });
+
+  card.appendChild(optionsBox);
+  card.appendChild(check);
   card.appendChild(explain);
   container.appendChild(card);
 }
