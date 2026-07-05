@@ -49,6 +49,16 @@
     .check-btn:disabled { opacity:0.5; cursor:default; }
     .qtype-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--warn-soft); color:var(--warn); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
     .level-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); border:1px solid var(--accent); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
+    .anim { margin:14px 0 0; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .anim svg { width:100%; height:auto; display:block; }
+    .anim svg text { font-family:inherit; }
+    .anim [data-anim] { transition:opacity .35s ease; }
+    .anim-controls { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .anim-btn { min-height:34px; padding:5px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font-weight:700; font-size:13px; cursor:pointer; }
+    .anim-btn:hover { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-strong); }
+    .anim-caption { flex:1 1 260px; font-size:13.5px; color:var(--muted); }
+    @keyframes animflash { 0% { filter:brightness(1); } 35% { filter:brightness(1.55); } 100% { filter:brightness(1); } }
+    .anim .flash { animation:animflash .9s ease; }
     .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
     .bar-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
     .bar-btn.secondary { background:var(--panel); color:var(--text); border-color:var(--line); }
@@ -176,6 +186,82 @@ b.X = 99;                               q.Name = "Bob";
 a.X is still 1                          p.Name is "Bob" too — one object,
                                         two variables aliasing it</pre>
 
+      <p class="diagram-title">Animated — stack &amp; heap, value vs reference assignment</p>
+      <div class="anim" id="anim-sh">
+        <svg viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated stack and heap diagram">
+          <defs>
+            <marker id="sh-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+            </marker>
+          </defs>
+
+          <!-- code panel -->
+          <text x="14" y="24" font-size="12" font-weight="700" fill="var(--muted)">CODE</text>
+          <rect data-anim="hl1" x="8"  y="33"  width="250" height="21" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect data-anim="hl2" x="8"  y="57"  width="250" height="21" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect data-anim="hl3" x="8"  y="81"  width="250" height="21" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect data-anim="hl4" x="8"  y="105" width="250" height="21" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect data-anim="hl5" x="8"  y="129" width="250" height="21" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect data-anim="hl6" x="8"  y="153" width="250" height="21" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="14" y="48"  font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">var a = new Point(1, 2);</text>
+          <text x="14" y="72"  font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">var b = a;</text>
+          <text x="14" y="96"  font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">b.X = 99;</text>
+          <text x="14" y="120" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">var p = new Person("Ann");</text>
+          <text x="14" y="144" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">var q = p;</text>
+          <text x="14" y="168" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">q.Name = "Bob";</text>
+          <text data-anim="structLabel" x="14" y="205" font-size="12.5" font-weight="700" fill="var(--accent-strong)">struct Point → copy semantics</text>
+          <text data-anim="classLabel"  x="14" y="205" font-size="12.5" font-weight="700" fill="var(--accent-strong)">class Person → reference semantics</text>
+
+          <!-- stack column -->
+          <text x="325" y="26" font-size="12" font-weight="700" fill="var(--muted)">STACK</text>
+          <rect x="268" y="34" width="190" height="280" rx="8" fill="none" stroke="var(--line)"/>
+          <g data-anim="sa">
+            <rect x="278" y="44" width="170" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="288" y="64" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">a  [ X = 1 | Y = 2 ]</text>
+          </g>
+          <g data-anim="sbOld">
+            <rect x="278" y="84" width="170" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="288" y="104" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">b  [ X = 1 | Y = 2 ]</text>
+          </g>
+          <g data-anim="sbNew">
+            <rect x="278" y="84" width="170" height="30" rx="6" fill="var(--warn-soft)" stroke="var(--warn)"/>
+            <text x="288" y="104" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">b  [ X = 99 | Y = 2 ]</text>
+          </g>
+          <text data-anim="aNote" x="280" y="140" font-size="12" font-weight="700" fill="var(--accent-strong)">a unchanged — independent copy ✓</text>
+          <g data-anim="sp">
+            <rect x="278" y="170" width="170" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="288" y="189" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">p  ● (reference)</text>
+          </g>
+          <g data-anim="sq">
+            <rect x="278" y="212" width="170" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="288" y="231" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">q  ● (reference)</text>
+          </g>
+
+          <!-- heap column -->
+          <text x="580" y="26" font-size="12" font-weight="700" fill="var(--muted)">HEAP</text>
+          <rect x="478" y="34" width="230" height="280" rx="8" fill="none" stroke="var(--line)"/>
+          <g data-anim="hAnn">
+            <rect x="494" y="168" width="200" height="64" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="506" y="190" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Person object</text>
+            <text x="506" y="214" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">Name = "Ann"</text>
+          </g>
+          <g data-anim="hBob">
+            <rect x="494" y="168" width="200" height="64" rx="8" fill="var(--warn-soft)" stroke="var(--warn)"/>
+            <text x="506" y="190" font-size="12.5" font-weight="700" fill="var(--warn)">Person object</text>
+            <text x="506" y="214" font-size="12.5" font-family="Consolas,Menlo,monospace" fill="var(--text)">Name = "Bob"</text>
+          </g>
+          <path data-anim="arP" d="M 448 184 C 470 184, 476 194, 492 196" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#sh-arrow)"/>
+          <path data-anim="arQ" d="M 448 226 C 470 226, 476 216, 492 212" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#sh-arrow)"/>
+          <text data-anim="note2" x="494" y="256" font-size="12" font-weight="700" fill="var(--warn)">one object — two variables see it</text>
+        </svg>
+        <div class="anim-controls">
+          <button class="anim-btn" type="button" data-act="prev">⏮ Back</button>
+          <button class="anim-btn" type="button" data-act="play">▶ Play</button>
+          <button class="anim-btn" type="button" data-act="next">Next ⏭</button>
+          <span class="anim-caption"></span>
+        </div>
+      </div>
+
       <p class="diagram-title">LINQ deferred execution — a pull pipeline, not a list</p>
       <pre class="diagram">var q = nums.Where(n =&gt; n % 2 == 0).Select(n =&gt; n * 10);   // NOTHING runs yet —
                                                            // q is a chain of iterators
@@ -263,6 +349,52 @@ compare Thread.Sleep / .Result: the thread sits occupied doing nothing.</pre>
                └─────────┘
 generational hypothesis: most objects die young → collect the nursery
 often and cheaply, touch the old heap rarely</pre>
+
+      <p class="diagram-title">Animated — GC generations in motion</p>
+      <div class="anim" id="anim-gc">
+        <svg viewBox="0 0 720 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Animated garbage collector generations diagram">
+          <text x="18"  y="40" font-size="12.5" font-weight="700" fill="var(--accent-strong)">gen 0 — nursery</text>
+          <text x="248" y="40" font-size="12.5" font-weight="700" fill="var(--accent-strong)">gen 1</text>
+          <text x="478" y="40" font-size="12.5" font-weight="700" fill="var(--accent-strong)">gen 2 — long-lived</text>
+          <rect x="18"  y="52" width="214" height="180" rx="8" fill="none" stroke="var(--line)"/>
+          <rect x="248" y="52" width="214" height="180" rx="8" fill="none" stroke="var(--line)"/>
+          <rect x="478" y="52" width="224" height="180" rx="8" fill="none" stroke="var(--line)"/>
+          <rect data-anim="g2hl" x="478" y="52" width="224" height="180" rx="8" fill="var(--accent-soft)" stroke="var(--accent-strong)" stroke-width="2.5"/>
+          <text x="18"  y="256" font-size="12" fill="var(--muted)">collected constantly — cheap</text>
+          <text x="248" y="256" font-size="12" fill="var(--muted)">survivor buffer</text>
+          <text x="478" y="256" font-size="12" fill="var(--muted)">collected rarely — expensive</text>
+
+          <!-- gen 0 objects, first batch A-F -->
+          <g data-anim="A"><rect x="36"  y="70"  width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="52"  y="87"  font-size="12.5" font-weight="700" fill="var(--accent-strong)">A</text></g>
+          <g data-anim="B"><rect x="130" y="70"  width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="146" y="87"  font-size="12.5" font-weight="700" fill="var(--accent-strong)">B</text></g>
+          <g data-anim="C"><rect x="36"  y="110" width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="52"  y="127" font-size="12.5" font-weight="700" fill="var(--accent-strong)">C</text></g>
+          <g data-anim="D"><rect x="130" y="110" width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="146" y="127" font-size="12.5" font-weight="700" fill="var(--accent-strong)">D</text></g>
+          <g data-anim="E"><rect x="36"  y="150" width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="52"  y="167" font-size="12.5" font-weight="700" fill="var(--accent-strong)">E</text></g>
+          <g data-anim="F"><rect x="130" y="150" width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="146" y="167" font-size="12.5" font-weight="700" fill="var(--accent-strong)">F</text></g>
+          <!-- dead variants -->
+          <g data-anim="deadA"><rect x="36"  y="70"  width="44" height="24" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="47"  y="87"  font-size="12.5" fill="var(--muted)">A ×</text></g>
+          <g data-anim="deadB"><rect x="130" y="70"  width="44" height="24" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="141" y="87"  font-size="12.5" fill="var(--muted)">B ×</text></g>
+          <g data-anim="deadD"><rect x="130" y="110" width="44" height="24" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="141" y="127" font-size="12.5" fill="var(--muted)">D ×</text></g>
+          <g data-anim="deadF"><rect x="130" y="150" width="44" height="24" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="141" y="167" font-size="12.5" fill="var(--muted)">F ×</text></g>
+          <!-- survivors in gen 1 -->
+          <g data-anim="C1"><rect x="266" y="90"  width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="282" y="107" font-size="12.5" font-weight="700" fill="var(--accent-strong)">C</text></g>
+          <g data-anim="E1"><rect x="266" y="140" width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="282" y="157" font-size="12.5" font-weight="700" fill="var(--accent-strong)">E</text></g>
+          <!-- promoted to gen 2 -->
+          <g data-anim="C2"><rect x="496" y="90"  width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent-strong)" stroke-width="2"/><text x="512" y="107" font-size="12.5" font-weight="700" fill="var(--accent-strong)">C</text></g>
+          <!-- second gen-0 batch -->
+          <g data-anim="G"><rect x="36"  y="70"  width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="52"  y="87"  font-size="12.5" font-weight="700" fill="var(--accent-strong)">G</text></g>
+          <g data-anim="H"><rect x="130" y="70"  width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="146" y="87"  font-size="12.5" font-weight="700" fill="var(--accent-strong)">H</text></g>
+          <g data-anim="I"><rect x="36"  y="110" width="44" height="24" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="52"  y="127" font-size="12.5" font-weight="700" fill="var(--accent-strong)">I</text></g>
+          <g data-anim="deadH"><rect x="130" y="70"  width="44" height="24" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="141" y="87"  font-size="12.5" fill="var(--muted)">H ×</text></g>
+          <g data-anim="deadI"><rect x="36"  y="110" width="44" height="24" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="47"  y="127" font-size="12.5" fill="var(--muted)">I ×</text></g>
+        </svg>
+        <div class="anim-controls">
+          <button class="anim-btn" type="button" data-act="prev">⏮ Back</button>
+          <button class="anim-btn" type="button" data-act="play">▶ Play</button>
+          <button class="anim-btn" type="button" data-act="next">Next ⏭</button>
+          <span class="anim-caption"></span>
+        </div>
+      </div>
 
       <div class="link-list">
         <a href="https://learn.microsoft.com/en-us/dotnet/csharp/" target="_blank" rel="noopener">C# documentation — Microsoft Learn</a>
@@ -870,6 +1002,73 @@ toggleBtn.addEventListener("click", () => {
 
 document.getElementById("retry").addEventListener("click", renderAll);
 renderAll();
+
+// ---- animated diagrams: gif-style looping SVG with play/pause/step ----
+function makeAnim(rootId, frames, msPerFrame) {
+  const root = document.getElementById(rootId);
+  if (!root) return;
+  const caption = root.querySelector(".anim-caption");
+  const els = Array.from(root.querySelectorAll("[data-anim]"));
+  const playBtn = root.querySelector('[data-act="play"]');
+  let idx = 0, timer = null;
+
+  function render(i) {
+    idx = ((i % frames.length) + frames.length) % frames.length;
+    const f = frames[idx];
+    for (const el of els) {
+      el.style.opacity = f.show.includes(el.dataset.anim) ? "1" : "0";
+      el.classList.remove("flash");
+    }
+    void root.offsetWidth; // restart flash animation
+    for (const id of f.flash || []) {
+      for (const el of els) if (el.dataset.anim === id) el.classList.add("flash");
+    }
+    caption.textContent = `${idx + 1}/${frames.length} — ${f.caption}`;
+  }
+  function stop() {
+    if (timer) { clearInterval(timer); timer = null; playBtn.textContent = "▶ Play"; }
+  }
+  playBtn.addEventListener("click", () => {
+    if (timer) return stop();
+    playBtn.textContent = "⏸ Pause";
+    render(idx + 1);
+    timer = setInterval(() => render(idx + 1), msPerFrame || 2800);
+  });
+  root.querySelector('[data-act="prev"]').addEventListener("click", () => { stop(); render(idx - 1); });
+  root.querySelector('[data-act="next"]').addEventListener("click", () => { stop(); render(idx + 1); });
+  render(0);
+  playBtn.click(); // autoplay, loops like a gif — user can pause/step
+}
+
+makeAnim("anim-sh", [
+  { show: ["hl1", "structLabel", "sa"], flash: ["sa"],
+    caption: "var a = new Point(1, 2) — a struct lives directly in the stack slot: the variable IS the data." },
+  { show: ["hl2", "structLabel", "sa", "sbOld"], flash: ["sbOld"],
+    caption: "var b = a — assignment COPIES every field; b is a fully independent value." },
+  { show: ["hl3", "structLabel", "sa", "sbNew", "aNote"], flash: ["sbNew", "aNote"],
+    caption: "b.X = 99 mutates only the copy — a.X is still 1. That is copy semantics." },
+  { show: ["hl4", "classLabel", "sa", "sbNew", "sp", "hAnn", "arP"], flash: ["sp", "hAnn", "arP"],
+    caption: "var p = new Person(\"Ann\") — the object is allocated on the HEAP; the stack slot holds only a reference." },
+  { show: ["hl5", "classLabel", "sa", "sbNew", "sp", "sq", "hAnn", "arP", "arQ"], flash: ["sq", "arQ"],
+    caption: "var q = p — assignment copies the REFERENCE, not the object: both variables point at the same heap object." },
+  { show: ["hl6", "classLabel", "sa", "sbNew", "sp", "sq", "hBob", "arP", "arQ", "note2"], flash: ["hBob", "note2"],
+    caption: "q.Name = \"Bob\" changes the one shared object — p.Name is now \"Bob\" too. That is reference semantics." }
+]);
+
+makeAnim("anim-gc", [
+  { show: ["A", "B", "C", "D", "E", "F"], flash: ["A", "B", "C", "D", "E", "F"],
+    caption: "Allocation is a pointer bump into gen 0 — new objects land in the nursery, nearly free." },
+  { show: ["deadA", "deadB", "C", "deadD", "E", "deadF"], flash: ["deadA", "deadB", "deadD", "deadF"],
+    caption: "Most objects die young: A, B, D, F become unreachable (temporaries, DTOs, intermediate strings)." },
+  { show: ["C1", "E1"], flash: ["C1", "E1"],
+    caption: "Gen 0 collection — survivors C and E are copied to gen 1; the dead are never touched. Cost ∝ survivors, not garbage." },
+  { show: ["C1", "E1", "G", "H", "I"], flash: ["G", "H", "I"],
+    caption: "The empty nursery immediately refills with new allocations — the cycle continues." },
+  { show: ["C2", "G", "deadH", "deadI"], flash: ["C2"],
+    caption: "Next cycle: C survives again and is promoted to gen 2; E and most of the new batch died young." },
+  { show: ["C2", "g2hl", "G"], flash: ["g2hl"],
+    caption: "Gen 2 holds the long-lived: caches, statics, singletons. Collected rarely — the full gen-2 GC is the expensive pause." }
+]);
 </script>
 </body>
 </html>
