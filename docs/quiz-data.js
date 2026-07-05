@@ -339,6 +339,54 @@ const quizData = {
         "Fix the root cause (unsubscribe, weak handler, bounded cache), redeploy, and watch the metric to confirm the slope is flat"
       ],
       explain: "A .NET 'leak' is a live-reference leak — the GC cannot collect what is still rooted, and the usual roots are statics: event subscriptions from long-lived publishers, caches without eviction, and captured contexts. Two dumps beat one because growth, not size, identifies the culprit; gcroot turns 'what' into 'who holds it'. The final step is the professional discipline: a fix isn't done until the graph proves it."
+    },
+    {
+      mono: true,
+      code: "async Task<string[]> DownloadAllAsync(string[] urls, HttpClient http)\n{\n    // ??? — download ALL urls concurrently, then return the results\n}",
+      q: "Which body downloads all URLs concurrently?",
+      options: [
+        ["var tasks = urls.Select(u => http.GetStringAsync(u)).ToArray();\nreturn await Task.WhenAll(tasks);", true],
+        ["var results = new List<string>();\nforeach (var u in urls)\n    results.Add(await http.GetStringAsync(u));\nreturn results.ToArray();", false],
+        ["return urls.AsParallel()\n    .Select(u => http.GetStringAsync(u).Result)\n    .ToArray();", false],
+        ["return (string[])urls.Select(async u => await http.GetStringAsync(u));", false]
+      ],
+      explain: "ToArray() materializes the Select, which STARTS every request; Task.WhenAll then awaits them together — total time ≈ the slowest single download. The foreach version compiles and works but awaits one download before starting the next: sequential, N× slower. AsParallel + .Result burns a blocked thread per URL (sync-over-async on the thread pool). The last option doesn't even type-check — Select of async lambdas yields IEnumerable<Task<string>>, not string[]."
+    },
+    {
+      mono: true,
+      code: "var actions = new List<Action>();\nfor (int i = 0; i < 3; i++)\n{\n    // ??? — each action must print its own iteration number\n}\nactions.ForEach(a => a());   // must print: 012",
+      q: "Which line makes the program print 012?",
+      options: [
+        ["int copy = i;\nactions.Add(() => Console.Write(copy));", true],
+        ["actions.Add(() => Console.Write(i));", false],
+        ["actions.Add(() => { int copy = i; Console.Write(copy); });", false],
+        ["actions.Add(delegate { Console.Write(i); });", false]
+      ],
+      explain: "Closures capture variables, not values. There is one i for the whole for-loop, so options 2 and 4 print 333 — all lambdas share the final value. Option 3 is the subtle trap: the copy is made when the lambda RUNS (after the loop, i is already 3), not when it is created. Only a fresh variable per iteration, declared outside the lambda but inside the loop body, gives each closure its own cell — which is exactly what foreach does automatically since C# 5."
+    },
+    {
+      mono: true,
+      code: "class RequestCounter\n{\n    private long _count;\n\n    public void Record()\n    {\n        // ??? — Record() is called concurrently from many threads\n    }\n\n    public long Value => Interlocked.Read(ref _count);\n}",
+      q: "Which implementation makes Record() thread-safe?",
+      options: [
+        ["Interlocked.Increment(ref _count);", true],
+        ["_count++;", false],
+        ["lock (_count) { _count++; }", false],
+        ["_count = Volatile.Read(ref _count) + 1;", false]
+      ],
+      explain: "_count++ compiles to load, add, store — two threads can interleave and lose increments. lock (_count) doesn't compile: lock needs a reference type, and boxing a long would lock a throwaway box anyway. Volatile.Read gives a fresh read but the add-and-store afterwards is still a race. Interlocked.Increment performs the whole read-modify-write as one atomic hardware instruction — correct and cheaper than a lock statement for a single counter."
+    },
+    {
+      mono: true,
+      code: "public async Task<Config> LoadAsync(string path)\n{\n    // ??? — the file handle must be released even if Parse throws\n    var json = await reader.ReadToEndAsync();\n    return Parse(json);\n}",
+      q: "Which declaration guarantees the file handle is released?",
+      options: [
+        ["using var reader = new StreamReader(path);", true],
+        ["var reader = new StreamReader(path);", false],
+        ["var reader = new StreamReader(path);\nreader.Dispose();", false],
+        ["var reader = new StreamReader(path);\nGC.Collect();  // clean up when done", false]
+      ],
+      explain: "'using var' compiles to try/finally around the rest of the scope: Dispose runs whether the method returns normally or Parse throws — and it composes correctly with await. A bare declaration leaks the OS handle on any exception until a finalizer eventually runs. Disposing immediately after construction closes the stream BEFORE the read, so ReadToEndAsync throws ObjectDisposedException. GC.Collect() is both the wrong tool (GC manages memory, not handles, deterministically) and a performance anti-pattern."
     }
   ],
 
@@ -627,6 +675,55 @@ const quizData = {
         "Replace the characterization tests with intent-revealing tests that specify the new behavior"
       ],
       explain: "This is the legacy-code loop (Feathers): you cannot safely change what you cannot test, and you cannot test without a seam — but creating the seam is itself a change, so characterization tests come first as a safety net that encodes reality, bugs included. Only at the end do tests switch from 'what it does' to 'what it should do'. The anti-pattern this prevents: a big-bang rewrite validated by nothing, discovered broken in production."
+    },
+    {
+      mono: true,
+      code: "public class InvoiceService\n{\n    // ??? — needs IInvoiceRepository; must be unit-testable without a database\n\n    public Invoice GetInvoice(int id) => _repo.Find(id);\n}",
+      q: "Which dependency declaration fits the requirement?",
+      options: [
+        ["private readonly IInvoiceRepository _repo;\npublic InvoiceService(IInvoiceRepository repo) => _repo = repo;", true],
+        ["private readonly SqlInvoiceRepository _repo = new SqlInvoiceRepository();", false],
+        ["private IInvoiceRepository _repo => ServiceLocator.Get<IInvoiceRepository>();", false],
+        ["public IInvoiceRepository Repo { get; set; }\nprivate IInvoiceRepository _repo => Repo;", false]
+      ],
+      explain: "Constructor injection of the interface is the whole recipe: the dependency is explicit, required (the object cannot exist without it), and a test passes a fake with plain new — no container. Hard-wiring SqlInvoiceRepository binds the class to a real database forever. The service-locator property hides the dependency and drags a static container into every test. Settable property injection makes the dependency optional and mutable — a half-constructed object waiting for a NullReferenceException."
+    },
+    {
+      mono: true,
+      code: "builder.Services.AddDbContext<ShopDbContext>(o => o.UseSqlServer(cs));\n// ??? — register OrderService (constructor takes ShopDbContext)\n//        and IClock (stateless time abstraction)",
+      q: "Which registrations have correct lifetimes?",
+      options: [
+        ["builder.Services.AddScoped<OrderService>();\nbuilder.Services.AddSingleton<IClock, SystemClock>();", true],
+        ["builder.Services.AddSingleton<OrderService>();\nbuilder.Services.AddSingleton<IClock, SystemClock>();", false],
+        ["builder.Services.AddSingleton<OrderService>();\nbuilder.Services.AddScoped<IClock, SystemClock>();", false],
+        ["builder.Services.AddSingleton<OrderService>();\nbuilder.Services.AddTransient<IClock, SystemClock>();", false]
+      ],
+      explain: "AddDbContext registers ShopDbContext as scoped, so anything consuming it must live at most as long as a scope: AddScoped<OrderService> is right (transient would work too). Every other option makes OrderService a singleton — the captive-dependency bug: one DbContext trapped for the process lifetime, shared across concurrent requests. The stateless clock is the mirror case: no state, safe everywhere, so singleton is the natural (cheapest) choice, and its lifetime never constrains anyone."
+    },
+    {
+      mono: true,
+      code: "public record Order(int Id, OrderStatus Status, decimal Total);\n\nOrder MarkPaid(Order order)\n{\n    // ??? — Order is immutable; return the paid version\n}",
+      q: "Which body is correct?",
+      options: [
+        ["return order with { Status = OrderStatus.Paid };", true],
+        ["order.Status = OrderStatus.Paid;\nreturn order;", false],
+        ["return new Order(order.Id, OrderStatus.Paid, 0m);", false],
+        ["return (Order)order.MemberwiseClone();", false]
+      ],
+      explain: "The with-expression is non-destructive mutation: it clones the record, replaces only the named members, and leaves the original untouched — exactly the idiom records exist for. Assigning order.Status doesn't compile: positional record properties are init-only. The manual constructor call compiles and is the trap — it silently zeroes Total, the bug with-expressions prevent. MemberwiseClone is protected (won't compile here) and would change nothing about Status anyway."
+    },
+    {
+      mono: true,
+      level: "senior",
+      code: "// shipped in v1 — hundreds of external implementers exist:\npublic interface IStorage\n{\n    Task SaveAsync(string key, byte[] data);\n\n    // v2 must add bulk save WITHOUT breaking existing implementers\n    // ???\n}",
+      q: "Which addition keeps every existing implementer compiling and working?",
+      options: [
+        ["async Task SaveManyAsync(IEnumerable<KeyValuePair<string, byte[]>> items)\n{\n    foreach (var item in items)\n        await SaveAsync(item.Key, item.Value);\n}", true],
+        ["Task SaveManyAsync(IEnumerable<KeyValuePair<string, byte[]>> items);", false],
+        ["[Obsolete(\"implement in v2\")]\nTask SaveManyAsync(IEnumerable<KeyValuePair<string, byte[]>> items);", false],
+        ["Task SaveManyAsync(IEnumerable<KeyValuePair<string, byte[]>> items)\n    => throw new NotImplementedException();", false]
+      ],
+      explain: "A default interface method (C# 8+) with a real fallback — loop over the existing SaveAsync — means old implementers keep compiling AND keep working; providers with a native bulk operation override it for performance. Adding an abstract member breaks every implementer at compile time, and [Obsolete] doesn't change that. The throwing default compiles but plants a landmine: callers see SaveManyAsync on every IStorage and get runtime explosions from implementations that never opted in — a contract that lies."
     }
   ],
 
@@ -958,6 +1055,55 @@ const quizData = {
         "Mark rows as dispatched; because delivery is now at-least-once, consumers deduplicate or stay idempotent"
       ],
       explain: "The trick is reducing two resources to one: the event is first written to the same database as the data, where a single local transaction guarantees atomicity. The relay then moves events to the broker asynchronously — a crash mid-publish means a retry, never a loss, shifting the guarantee to at-least-once (hence idempotent consumers, e.g. keyed by event id). This is the standard production answer to the dual-write problem, with CDC (e.g. Debezium) as the log-tailing variant."
+    },
+    {
+      mono: true,
+      code: "var app = builder.Build();\napp.UseExceptionHandler(\"/error\");\napp.UseStaticFiles();\napp.UseRouting();\n// ??? — controllers use [Authorize] attributes\napp.MapControllers();\napp.Run();",
+      q: "What belongs in the gap?",
+      options: [
+        ["app.UseAuthentication();\napp.UseAuthorization();", true],
+        ["app.UseAuthorization();\napp.UseAuthentication();", false],
+        ["app.UseAuthorization();   // authentication is implied by authorization", false],
+        ["Nothing — [Authorize] attributes work without any auth middleware", false]
+      ],
+      explain: "Both middlewares, in that order, after routing: authentication reads the token/cookie and builds HttpContext.User; authorization then evaluates the matched endpoint's [Authorize] policy against that principal (which is why it must follow UseRouting — the endpoint metadata comes from the route match). Reversed, authorization always sees an anonymous user: valid tokens get 401s. And without the middleware entirely, the attributes are inert metadata — nothing ever evaluates them."
+    },
+    {
+      mono: true,
+      code: "app.MapGet(\"/products\", async (ShopDbContext db) =>\n    // ??? — read-only listing; must not fetch whole entities,\n    //        track them, or pull the table into memory\n);",
+      q: "Which query fits all three constraints?",
+      options: [
+        ["await db.Products\n    .Where(p => p.Active)\n    .Select(p => new ProductDto(p.Id, p.Name, p.Price))\n    .ToListAsync()", true],
+        ["db.Products.ToList()\n    .Where(p => p.Active)\n    .Select(p => new ProductDto(p.Id, p.Name, p.Price))", false],
+        ["await db.Products.ToListAsync()\n    .ContinueWith(t => t.Result.Where(p => p.Active))", false],
+        ["db.Products.AsEnumerable()\n    .Where(p => p.Active)\n    .Select(p => new ProductDto(p.Id, p.Name, p.Price))\n    .ToList()", false]
+      ],
+      explain: "Keeping Where and Select on the IQueryable means EF translates both to SQL: the database filters, only three columns cross the wire, and projecting to a DTO skips change tracking automatically (no AsNoTracking needed). Every other option pulls the ENTIRE table into memory first — ToList() before the Where, or AsEnumerable() silently switching to client-side LINQ — plus option 2 blocks synchronously and option 3 revives the pre-async ContinueWith style with .Result inside."
+    },
+    {
+      mono: true,
+      level: "senior",
+      code: "public class QueueWorker(IServiceScopeFactory scopeFactory, IWorkQueue queue)\n    : BackgroundService\n{\n    protected override async Task ExecuteAsync(CancellationToken stoppingToken)\n    {\n        while (!stoppingToken.IsCancellationRequested)\n        {\n            var item = await queue.DequeueAsync(stoppingToken);\n            // ??? — process the item using AppDbContext (registered scoped)\n        }\n    }\n}",
+      q: "Which processing block is correct?",
+      options: [
+        ["using var scope = scopeFactory.CreateScope();\nvar db = scope.ServiceProvider.GetRequiredService<AppDbContext>();\nawait ProcessAsync(item, db, stoppingToken);", true],
+        ["// inject AppDbContext via the constructor instead of the factory\nawait ProcessAsync(item, _db, stoppingToken);", false],
+        ["var db = new AppDbContext();\nawait ProcessAsync(item, db, stoppingToken);", false],
+        ["_dbCache ??= scopeFactory.CreateScope()\n    .ServiceProvider.GetRequiredService<AppDbContext>();\nawait ProcessAsync(item, _dbCache, stoppingToken);", false]
+      ],
+      explain: "A scope per work item: fresh DbContext, processed, disposed — tracked entities released every iteration and no state bleeding between items. Constructor injection can't work: BackgroundService is a singleton, so a scoped DbContext would be captive (and the container's scope validation throws at startup). new AppDbContext() bypasses DI configuration (connection string, interceptors, logging). Caching the context in a field is the captive dependency rebuilt by hand — plus the scope is never disposed, so it leaks everything it ever touched."
+    },
+    {
+      mono: true,
+      code: "// GitHubService is resolved per request and calls the GitHub API under high load\n// Program.cs:\nbuilder.Services.AddHttpClient<GitHubService>(c =>\n    c.BaseAddress = new Uri(\"https://api.github.com/\"));\n\npublic class GitHubService\n{\n    // ???\n\n    public async Task<string> GetRepoAsync(string name) =>\n        await _http.GetStringAsync($\"repos/{name}\");\n}",
+      q: "Which client declaration completes the typed-client pattern?",
+      options: [
+        ["private readonly HttpClient _http;\npublic GitHubService(HttpClient http) => _http = http;", true],
+        ["private readonly HttpClient _http = new HttpClient\n{\n    BaseAddress = new Uri(\"https://api.github.com/\")\n};", false],
+        ["private HttpClient _http => new HttpClient\n{\n    BaseAddress = new Uri(\"https://api.github.com/\")\n};", false],
+        ["private static readonly HttpClient _http = new HttpClient();", false]
+      ],
+      explain: "AddHttpClient<GitHubService> registers the service so the factory injects a pre-configured HttpClient whose message handlers are pooled and rotated — accept it in the constructor and the socket-exhaustion and stale-DNS problems are both handled. Field-initializing a new client per service instance recreates exhaustion under load (the service is per-request); the expression-bodied property is worse — a new client per HTTP CALL. The static client fixes exhaustion but never re-resolves DNS, ignores the registered BaseAddress, and can't participate in Polly policies attached to the factory registration."
     }
   ]
 };

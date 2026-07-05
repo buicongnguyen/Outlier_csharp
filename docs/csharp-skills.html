@@ -26,7 +26,9 @@
     .quiz { margin-top:12px; }
     .quiz-card { margin:10px 0; padding:14px 15px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
     .quiz-card p.q { margin-bottom:10px; font-weight:700; }
+    .quiz-card pre.code { margin:0 0 12px; padding:12px 14px; overflow-x:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; font-family:Consolas,Menlo,monospace; font-size:13px; line-height:1.5; color:var(--text); }
     .options { display:grid; gap:8px; }
+    .options.mono button { font-family:Consolas,Menlo,monospace; font-size:13px; white-space:pre-wrap; line-height:1.5; }
     .options button { min-height:40px; padding:8px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font-size:15px; text-align:left; cursor:pointer; }
     .options button:hover:enabled { border-color:var(--accent); background:var(--accent-soft); }
     .options button:disabled { cursor:default; opacity:0.85; }
@@ -78,8 +80,10 @@
         areas: the C# language and .NET runtime, object-oriented design, and application architecture with
         the common frameworks and tools. Each section has a definitions list, core-concept cards with
         tradeoffs and pitfalls, ASCII diagrams and code walkthroughs where a picture helps, further-reading
-        links, and a bank of practice questions with explanations in three formats: classic single-answer,
-        select-all-that-apply (the whole set must match), and click-the-steps-in-order design chains.
+        links, and a bank of practice questions with explanations in four formats: classic single-answer,
+        select-all-that-apply (the whole set must match), click-the-steps-in-order design chains, and
+        complete-the-code questions where a snippet has a <code>// ???</code> gap and you pick the fragment
+        that belongs there.
         Difficulty runs from recall up to applied reasoning; questions tagged <em>senior+</em> target
         senior/principal-level judgment — production diagnosis, API evolution under compatibility
         constraints, and distributed-system tradeoffs.
@@ -504,14 +508,23 @@ function updateScore() {
   }
 }
 
+function attachCode(card, item) {
+  if (!item.code) return;
+  const pre = el("pre", "code");
+  pre.textContent = item.code;
+  card.appendChild(pre);
+}
+
 function renderQuestion(container, item, number, sectionKey) {
   if (item.type === "multi") return renderMulti(container, item, number, sectionKey);
   if (item.type === "order") return renderOrder(container, item, number, sectionKey);
   const card = el("article", "quiz-card");
   const title = el("p", "q", `Q${number}. ${item.q}`);
+  if (item.code) title.appendChild(el("span", "qtype-tag", "complete the code"));
   if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
-  const optionsBox = el("div", "options");
+  attachCode(card, item);
+  const optionsBox = el("div", "options" + (item.mono ? " mono" : ""));
   const explain = el("div", "explain");
   explain.appendChild(document.createTextNode(item.explain));
 
@@ -548,7 +561,8 @@ function renderMulti(container, item, number, sectionKey) {
   title.appendChild(el("span", "qtype-tag", "select ALL that apply"));
   if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
-  const optionsBox = el("div", "options");
+  attachCode(card, item);
+  const optionsBox = el("div", "options" + (item.mono ? " mono" : ""));
   const explain = el("div", "explain");
   explain.appendChild(document.createTextNode(item.explain));
 
@@ -596,6 +610,7 @@ function renderOrder(container, item, number, sectionKey) {
   title.appendChild(el("span", "qtype-tag", "click the steps in order"));
   if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
+  attachCode(card, item);
   const optionsBox = el("div", "options");
   const explain = el("div", "explain");
   explain.appendChild(document.createTextNode(
