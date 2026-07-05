@@ -213,6 +213,24 @@ fix — copy inside the body: one DisplayClass PER iteration:
 
 (foreach makes a fresh loop variable per iteration since C# 5 — for does not)</pre>
 
+      <p class="diagram-title">An event under the hood — invocation list and the classic leak</p>
+      <pre class="diagram">publisher.Click += a.OnClick;   publisher.Click += b.OnClick;
+
+  publisher (long-lived)               multicast delegate
+  ┌─────────────────────┐
+  │ Click: Delegate ────┼──▶ [ a.OnClick │ b.OnClick ]   invocation list
+  └─────────────────────┘        │             │
+                          strong ▼      strong ▼
+                          a (target)    b (target)
+
+raise:  Click?.Invoke(this, e)  →  calls every entry IN ORDER, on the
+                                   raising thread (?. guards "no subscribers")
+
+THE LEAK: each entry holds a strong reference to its target object.
+b's window closed, but it never unsubscribed → still reachable from the
+publisher → never collected, still receives every event.
+fix: publisher.Click -= b.OnClick on teardown (Dispose/Unloaded).</pre>
+
       <p class="diagram-title">async/await — what the thread actually does</p>
       <pre class="diagram">async Task&lt;string&gt; GetUserAsync(int id) {
     var http = ...;                          // ── runs synchronously on caller thread
@@ -495,6 +513,27 @@ projection also skips change tracking — ideal for read endpoints.
 watch the logs: EF logs every SQL statement it sends (EnableSensitiveDataLogging
 in dev) — the N+1 is obvious the moment you look.</pre>
 
+      <p class="diagram-title">EF Core round trip — sequence from LINQ to UPDATE</p>
+      <pre class="diagram">var o = db.Orders.First(o =&gt; o.Id == 7);   o.Status = "Shipped";   db.SaveChanges();
+
+your code                DbContext / change tracker              database
+   │  LINQ expression tree   │                                       │
+   │ ──────────────────────▶ │  translate to SQL                     │
+   │                         │ ── SELECT … WHERE Id = 7 ───────────▶ │
+   │                         │ ◀──────────────────── row ─────────── │
+   │ ◀── entity ──────────── │  materialize + save a SNAPSHOT        │
+   │  o.Status = "Shipped"   │  (nothing sent — just a C# object)    │
+   │  SaveChanges()          │                                       │
+   │ ──────────────────────▶ │  diff every tracked entity vs its     │
+   │                         │  snapshot → o.Status changed          │
+   │                         │ ── BEGIN TX; UPDATE Orders            │
+   │                         │    SET Status=@p WHERE Id=7; COMMIT ▶ │
+   │ ◀── rows affected ───── │                                       │
+
+AsNoTracking() skips the snapshot: reads get cheaper, but SaveChanges has
+nothing to diff — which is exactly why it belongs on read-only queries.
+One SaveChanges = one transaction: all pending changes commit or none do.</pre>
+
       <p class="diagram-title">Idempotency keys — sequence of a safe retry</p>
       <pre class="diagram">client                         API                          store
   │  POST /payments               │                            │
@@ -546,6 +585,23 @@ deploy timeline:      v1 ▓▓▓▓▓░░░░░
                                                         TWO versions run at once
 every intermediate schema works for both live versions — one breaking change
 split into three deployable, individually reversible steps.</pre>
+
+      <p class="diagram-title">The testing pyramid in .NET — count, speed, scope</p>
+      <pre class="diagram">                                     count      speed     what it proves
+              ┌───────────┐
+              │    E2E    │           ~10     seconds    the deployed system's
+             ┌┴───────────┴┐                             money paths still work
+             │ integration │          ~100    ~100 ms    real routing/DI/serialization
+            ┌┴─────────────┴┐                            (WebApplicationFactory) + real
+            │               │                            DB via Testcontainers
+            │  unit tests   │        1000s     ~1 ms     domain + application logic,
+            └───────────────┘                            Moq fakes at the ports
+
+wide base = most feedback comes in milliseconds, and a failure names the
+exact class.  Inverted pyramids (mostly E2E) are slow, flaky, and can only
+say "something broke somewhere."
+hidden value: hard-to-unit-test code (statics, new-ed dependencies, inline
+DateTime.Now) is coupled code — testability pressure IS design pressure.</pre>
 
       <div class="link-list">
         <a href="https://learn.microsoft.com/en-us/aspnet/core/" target="_blank" rel="noopener">ASP.NET Core documentation</a>
