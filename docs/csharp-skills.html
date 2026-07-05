@@ -49,6 +49,9 @@
     .check-btn:disabled { opacity:0.5; cursor:default; }
     .qtype-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--warn-soft); color:var(--warn); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
     .level-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); border:1px solid var(--accent); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
+    .drill-solution { display:none; margin-top:10px; }
+    .drill-solution.open { display:block; }
+    .show-all .drill-solution { display:block; }
     .anim { margin:14px 0 0; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
     .anim svg { width:100%; height:auto; display:block; }
     .anim svg text { font-family:inherit; }
@@ -78,6 +81,7 @@
       <a href="#lang">Language &amp; Runtime</a>
       <a href="#ood">OO Design</a>
       <a href="#arch">Architecture</a>
+      <a href="#drills">Coding Drills</a>
       <a href="#resources">Resources</a>
     </nav>
   </header>
@@ -747,6 +751,19 @@ DateTime.Now) is coupled code — testability pressure IS design pressure.</pre>
       <div class="quiz" data-section="arch"></div>
     </section>
 
+    <!-- ================= 4. CODING INTERVIEW DRILLS ================= -->
+    <section id="drills" class="section">
+      <h2>4. Coding Interview Drills</h2>
+      <p class="section-note">
+        Hands-on problems repeatedly reported from real C#/.NET interviews (Glassdoor write-ups and
+        interview-prep compilations): the string and collection classics, LINQ exercises, and the
+        concurrency traps. Try each one on paper or in a scratch project first, then open the model
+        solution — the notes call out the follow-up points interviewers actually probe for. These
+        drills are not scored.
+      </p>
+      <div id="drills-list"></div>
+    </section>
+
     <!-- ================= RESOURCES ================= -->
     <section id="resources" class="section">
       <h2>Further Study</h2>
@@ -1002,6 +1019,40 @@ toggleBtn.addEventListener("click", () => {
 
 document.getElementById("retry").addEventListener("click", renderAll);
 renderAll();
+
+// ---- coding interview drills: prompt + reveal-a-solution cards ----
+function renderDrills() {
+  const box = document.getElementById("drills-list");
+  if (!box || typeof drillData === "undefined") return;
+  drillData.forEach((d, i) => {
+    const card = el("article", "quiz-card");
+    const title = el("p", "q", `D${i + 1}. ${d.title}`);
+    title.appendChild(el("span", "qtype-tag", "coding drill"));
+    if (d.level) title.appendChild(el("span", "level-tag", "senior+"));
+    card.appendChild(title);
+    card.appendChild(el("p", "", d.prompt));
+    if (d.example) {
+      const ex = el("pre", "code");
+      ex.textContent = d.example;
+      card.appendChild(ex);
+    }
+    const btn = el("button", "check-btn", "Show solution");
+    btn.type = "button";
+    const sol = el("div", "drill-solution");
+    const codePre = el("pre", "code");
+    codePre.textContent = d.solution;
+    sol.appendChild(codePre);
+    if (d.notes) sol.appendChild(el("div", "explain show", d.notes));
+    btn.addEventListener("click", () => {
+      const open = sol.classList.toggle("open");
+      btn.textContent = open ? "Hide solution" : "Show solution";
+    });
+    card.appendChild(btn);
+    card.appendChild(sol);
+    box.appendChild(card);
+  });
+}
+renderDrills();
 
 // ---- animated diagrams: gif-style looping SVG with play/pause/step ----
 function makeAnim(rootId, frames, msPerFrame) {

@@ -1107,3 +1107,104 @@ const quizData = {
     }
   ]
 };
+
+// Coding interview drills: problems repeatedly reported from real C#/.NET
+// interviews. Format: { title, prompt, example?, solution, notes, level? }
+const drillData = [
+  {
+    title: "Reverse a string (no Array.Reverse / LINQ Reverse)",
+    prompt: "Write a method that reverses a string. Interviewers usually forbid the built-in helpers to see whether you can move indices yourself.",
+    example: "Reverse(\"hello\")  →  \"olleh\"",
+    solution: "static string Reverse(string s)\n{\n    var chars = s.ToCharArray();\n    for (int i = 0, j = chars.Length - 1; i < j; i++, j--)\n        (chars[i], chars[j]) = (chars[j], chars[i]);   // tuple swap, no temp\n    return new string(chars);\n}\n\n// if built-ins ARE allowed, say the tradeoff out loud:\n// new string(s.Reverse().ToArray());   // shorter, allocates more",
+    notes: "Strings are immutable, so you must copy to a char array first — saying that is half the answer. The two-pointer swap is O(n) time, one allocation. Senior follow-up: this reverses UTF-16 code units, so emoji/surrogate pairs and combining accents break; a fully correct reverse walks grapheme clusters with StringInfo.GetTextElementEnumerator."
+  },
+  {
+    title: "Palindrome check, ignoring case and punctuation",
+    prompt: "Return true if a string reads the same forwards and backwards, considering only letters and digits and ignoring case.",
+    example: "IsPalindrome(\"A man, a plan, a canal: Panama\")  →  true",
+    solution: "static bool IsPalindrome(string s)\n{\n    int i = 0, j = s.Length - 1;\n    while (i < j)\n    {\n        while (i < j && !char.IsLetterOrDigit(s[i])) i++;\n        while (i < j && !char.IsLetterOrDigit(s[j])) j--;\n        if (char.ToLowerInvariant(s[i]) != char.ToLowerInvariant(s[j]))\n            return false;\n        i++; j--;\n    }\n    return true;\n}",
+    notes: "Two pointers walking inward: O(n) time, zero allocations — better than the tempting 'normalize the string, then compare with its reverse', which allocates three strings. The inner skip-loops handle the punctuation without a regex. Mention ToLowerInvariant vs ToLower: culture-sensitive casing (the Turkish-İ problem) is a real bug class."
+  },
+  {
+    title: "FizzBuzz — the filter question",
+    prompt: "Print 1 to 100; multiples of 3 print \"Fizz\", multiples of 5 print \"Buzz\", multiples of both print \"FizzBuzz\". Trivial on purpose — it filters out candidates who cannot write any code, and the follow-ups test style.",
+    solution: "for (int i = 1; i <= 100; i++)\n{\n    string output = (i % 3, i % 5) switch\n    {\n        (0, 0) => \"FizzBuzz\",\n        (0, _) => \"Fizz\",\n        (_, 0) => \"Buzz\",\n        _      => i.ToString()\n    };\n    Console.WriteLine(output);\n}",
+    notes: "The classic bug is testing i % 3 before i % 15 in an if/else chain, so \"FizzBuzz\" never prints — whatever construct you use, the both-case must win. The tuple-pattern switch expression reads like the spec and quietly shows you write modern C#. Follow-up they like: make the rules data-driven (a list of (divisor, word) pairs) so adding 7 → \"Bazz\" is a one-line change."
+  },
+  {
+    title: "Find the duplicates in a collection",
+    prompt: "Given an array of values, return the ones that appear more than once. Asked constantly, usually as 'and now without LINQ' after you give the LINQ answer.",
+    example: "FindDupes([3, 7, 3, 1, 7, 3])  →  [3, 7]",
+    solution: "// LINQ — the expressive answer:\nvar dupes = numbers.GroupBy(n => n)\n                   .Where(g => g.Count() > 1)\n                   .Select(g => g.Key)\n                   .ToList();\n\n// HashSet — the O(n) single-pass answer:\nvar seen  = new HashSet<int>();\nvar dupes2 = new HashSet<int>();\nforeach (var n in numbers)\n    if (!seen.Add(n))     // Add returns false if already present\n        dupes2.Add(n);",
+    notes: "Give both and say when each wins: GroupBy is clearest and fine for normal sizes; the HashSet pass is O(n) with no grouping overhead and streams. The seen.Add(n) == false trick — test-and-insert in one call — is the idiomatic move interviewers watch for. Dictionary<T,int> is the variant when they also want the counts."
+  },
+  {
+    title: "Are two strings anagrams?",
+    prompt: "Return true if two strings contain exactly the same characters in a different order.",
+    example: "IsAnagram(\"listen\", \"silent\")  →  true",
+    solution: "// O(n log n) one-liner — lead with this:\nstatic bool IsAnagram(string a, string b) =>\n    a.Length == b.Length &&\n    a.ToLowerInvariant().OrderBy(c => c)\n     .SequenceEqual(b.ToLowerInvariant().OrderBy(c => c));\n\n// O(n) counting version — the follow-up:\nstatic bool IsAnagramFast(string a, string b)\n{\n    if (a.Length != b.Length) return false;\n    var counts = new Dictionary<char, int>();\n    foreach (var c in a) counts[c] = counts.GetValueOrDefault(c) + 1;\n    foreach (var c in b)\n    {\n        if (counts.GetValueOrDefault(c) == 0) return false;\n        counts[c]--;\n    }\n    return true;\n}",
+    notes: "The sort-and-compare version is the readable answer; the counting version is the 'can you do better than O(n log n)?' answer — one dictionary, increment on the first string, decrement on the second, fail on any underflow. The early length check short-circuits most negatives for free."
+  },
+  {
+    title: "First non-repeated character",
+    prompt: "Find the first character in a string that appears exactly once.",
+    example: "FirstNonRepeated(\"swiss\")  →  'w'",
+    solution: "static char? FirstNonRepeated(string s)\n{\n    var counts = new Dictionary<char, int>();\n    foreach (var c in s)\n        counts[c] = counts.GetValueOrDefault(c) + 1;\n\n    foreach (var c in s)          // second pass preserves original order\n        if (counts[c] == 1) return c;\n\n    return null;\n}",
+    notes: "Two passes, O(n): count everything, then re-walk the ORIGINAL string so order is preserved — the subtle mistake is iterating the dictionary, whose order is an implementation detail you must not rely on. char? handles the no-answer case honestly. The one-pass LINQ (s.GroupBy(c => c).First(g => g.Count() == 1).Key) reads well but throws when nothing qualifies — say so."
+  },
+  {
+    title: "Word frequency — top N words in a sentence",
+    prompt: "Count how often each word occurs and return the top 3, most frequent first. The bread-and-butter LINQ interview exercise.",
+    example: "\"the quick brown fox jumps over the lazy dog the fox\"\n→  the: 3,  fox: 2,  brown: 1  (ties broken alphabetically)",
+    solution: "var top3 = text.Split(' ', StringSplitOptions.RemoveEmptyEntries)\n               .GroupBy(w => w.ToLowerInvariant())\n               .Select(g => new { Word = g.Key, Count = g.Count() })\n               .OrderByDescending(x => x.Count)\n               .ThenBy(x => x.Word)          // deterministic ties\n               .Take(3)\n               .ToList();",
+    notes: "GroupBy → project → order → Take is the LINQ pipeline shape they want to see composed fluently. Points scored for: normalizing case inside the GroupBy key, RemoveEmptyEntries against double spaces, and a ThenBy tie-breaker (without it, ordering among equal counts is nondeterministic). Without LINQ: the same Dictionary<string,int> counting loop as the anagram drill."
+  },
+  {
+    title: "Fibonacci — and the O(2ⁿ) trap",
+    prompt: "Return the n-th Fibonacci number. The real test: do you know why the naive recursive version is unusable, and how to fix it?",
+    example: "Fib(10)  →  55",
+    solution: "// iterative: O(n) time, O(1) space — the answer to give\nstatic long Fib(int n)\n{\n    if (n < 2) return n;\n    long prev = 0, curr = 1;\n    for (int i = 2; i <= n; i++)\n        (prev, curr) = (curr, prev + curr);\n    return curr;\n}\n\n// the trap, for contrast:\n// static long FibNaive(int n) =>\n//     n < 2 ? n : FibNaive(n - 1) + FibNaive(n - 2);   // O(2^n)!",
+    notes: "The naive recursion recomputes the same subproblems exponentially — Fib(50) is billions of calls; be ready to say that with a straight face. Memoization (a Dictionary cache around the recursion) fixes it at O(n) and demonstrates dynamic programming vocabulary; the iterative two-variable version is simply better here. Bonus point: Fib(93) overflows long — mention checked arithmetic or BigInteger."
+  },
+  {
+    title: "Second largest value — one pass, no sorting",
+    prompt: "Find the second largest number in an unsorted array. 'Without sorting' is usually stated up front; duplicates must not count twice.",
+    example: "SecondLargest([5, 1, 9, 9, 4])  →  5",
+    solution: "static int? SecondLargest(int[] nums)\n{\n    int? max = null, second = null;\n    foreach (var n in nums)\n    {\n        if (max == null || n > max)      { second = max; max = n; }\n        else if (n < max &&\n                 (second == null || n > second)) second = n;\n    }\n    return second;   // null when no distinct second exists\n}",
+    notes: "Two rolling variables, one O(n) pass — sorting is O(n log n) and the Distinct().OrderByDescending().Skip(1) LINQ answer hides that cost, which is exactly what the interviewer wants you to notice. Edge cases carry the points: duplicates of the maximum (the n < max guard), arrays of one element, all-equal arrays — returning int? makes 'there is no answer' explicit instead of a magic value."
+  },
+  {
+    title: "Chunk / batch a sequence into groups of N",
+    prompt: "Write an extension method that splits any IEnumerable<T> into batches of size N — the lazy, streaming way (think: paging database writes).",
+    example: "[1,2,3,4,5,6,7].Chunk(3)  →  [1,2,3], [4,5,6], [7]",
+    solution: "static IEnumerable<List<T>> Chunk<T>(this IEnumerable<T> source, int size)\n{\n    var batch = new List<T>(size);\n    foreach (var item in source)\n    {\n        batch.Add(item);\n        if (batch.Count == size)\n        {\n            yield return batch;\n            batch = new List<T>(size);   // NEW list — never reuse the yielded one\n        }\n    }\n    if (batch.Count > 0)\n        yield return batch;              // the final partial batch\n}",
+    notes: "Tests three things at once: extension-method syntax, yield return (lazy — works on infinite sequences and never materializes the whole source), and the aliasing bug — reusing and Clear()-ing one list corrupts batches a caller has already received. Don't forget the trailing partial batch. Then earn the closing point: .NET 6+ ships this as Enumerable.Chunk, so in production you'd use the built-in."
+  },
+  {
+    title: "Thread-safe lazy singleton",
+    prompt: "Implement a singleton that is created lazily and is safe under concurrent first access. A classic that doubles as a concurrency screen.",
+    solution: "public sealed class AppConfig\n{\n    private static readonly Lazy<AppConfig> _instance =\n        new(() => new AppConfig());\n\n    public static AppConfig Instance => _instance.Value;\n\n    private AppConfig() { }   // private ctor: nobody else can construct\n}",
+    notes: "Lazy<T> is the modern answer: the runtime guarantees the factory runs exactly once, and you skip the double-checked-locking minefield (volatile, memory barriers, partially-published objects) — be able to EXPLAIN that minefield, then decline to walk into it. sealed + private ctor close the loopholes. And the senior kicker: in a DI application the container owns lifetimes, so services.AddSingleton<AppConfig>() replaces the pattern entirely; hand-rolled singletons also hurt testability (global state)."
+  },
+  {
+    level: "senior",
+    title: "This code sometimes hangs — find and fix the deadlock",
+    prompt: "Two threads, two locks. In production it freezes once a week. Explain why, then fix it.",
+    example: "object lockA = new(), lockB = new();\n\n// thread 1:                       // thread 2:\nlock (lockA)                       lock (lockB)\n{                                  {\n    Thread.Sleep(50);                  Thread.Sleep(50);\n    lock (lockB) { /* work */ }        lock (lockA) { /* work */ }\n}                                  }",
+    solution: "// Thread 1 holds A and waits for B; thread 2 holds B and waits for A —\n// a circular wait. Neither can ever proceed.\n\n// FIX: one global lock ORDER. Every thread acquires A before B, always:\n// thread 2 becomes:\nlock (lockA)\n{\n    lock (lockB) { /* work */ }\n}\n\n// alternatives, in preference order:\n// 1. hold ONE lock instead of two (coarsen or redesign the critical section)\n// 2. Monitor.TryEnter(lockB, timeout) — back off, release A, retry\n// 3. in async code the same bug wears a different mask:\n//    task.Result / .Wait() under a SynchronizationContext — fix is\n//    async all the way down, never block on a Task",
+    notes: "Name the theory briefly — deadlock needs a circular wait among lock holders, and a consistent acquisition order makes cycles impossible — then show the one-line fix. The intermittent, once-a-week nature is itself a signature: it only bites when the schedules interleave just wrong. Production debugging follow-up: capture a dump and look at the blocked threads' stacks (dotnet-dump analyze, clrstack) — both threads visibly parked on Monitor.Enter tells the whole story."
+  },
+  {
+    level: "senior",
+    title: "Download many URLs concurrently — without failing the whole batch",
+    prompt: "Fetch 100 URLs concurrently; one flaky URL must not sink the other 99. Return the successes. Tests whether your async is real or ceremonial.",
+    solution: "static async Task<Dictionary<string, string>> FetchAllAsync(\n    IEnumerable<string> urls, HttpClient http, int maxParallel = 8)\n{\n    using var gate = new SemaphoreSlim(maxParallel);   // cap concurrency\n\n    var tasks = urls.Select(async url =>\n    {\n        await gate.WaitAsync();\n        try   { return (url, body: await http.GetStringAsync(url)); }\n        catch (HttpRequestException) { return (url, body: (string?)null); }\n        finally { gate.Release(); }\n    }).ToList();          // ToList NOW — this is what starts the work\n\n    var results = await Task.WhenAll(tasks);\n    return results.Where(r => r.body != null)\n                  .ToDictionary(r => r.url, r => r.body!);\n}",
+    notes: "Three separately-graded ideas: (1) start-then-await — the ToList materializes the Select so all tasks begin before any await; (2) the try/catch lives INSIDE each task, because Task.WhenAll surfaces only one exception and would discard the 99 good results; (3) the SemaphoreSlim throttle — unbounded fan-out to one host is a self-inflicted denial of service. Senior variants to know: Parallel.ForEachAsync (.NET 6+) does the throttling for you; IAsyncEnumerable streams results as they land."
+  },
+  {
+    title: "LINQ: top 2 earners per department",
+    prompt: "Given employees { Name, Department, Salary }, return the two highest-paid people in each department. The standard 'do you actually know LINQ beyond Where' exercise.",
+    solution: "var top2PerDept = employees\n    .GroupBy(e => e.Department)\n    .SelectMany(g => g.OrderByDescending(e => e.Salary)\n                      .ThenBy(e => e.Name)      // deterministic ties\n                      .Take(2))\n    .ToList();",
+    notes: "GroupBy makes the buckets; the trick being tested is SelectMany — order-and-take INSIDE each group, then flatten the per-group results back into one list. (Select would give you a list of lists.) Say the EF Core caveat out loud for senior credit: this shape only translates to SQL on newer providers; on older ones you'd see client evaluation or an error, and the server-side rewrite uses a windowed subquery. Follow-ups to expect: highest per group (MaxBy in .NET 6+), average salary per department, departments with fewer than 2 people (Take(2) just returns what exists — no crash)."
+  }
+];
