@@ -176,6 +176,43 @@ b.X = 99;                               q.Name = "Bob";
 a.X is still 1                          p.Name is "Bob" too — one object,
                                         two variables aliasing it</pre>
 
+      <p class="diagram-title">LINQ deferred execution — a pull pipeline, not a list</p>
+      <pre class="diagram">var q = nums.Where(n =&gt; n % 2 == 0).Select(n =&gt; n * 10);   // NOTHING runs yet —
+                                                           // q is a chain of iterators
+        pull (MoveNext)          pull                  pull
+┌──────────┐ ──────▶ ┌─────────────┐ ──────▶ ┌─────────────┐ ──────▶ ┌──────────┐
+│ foreach  │         │ Select  ×10 │         │ Where  even │         │ nums     │
+│ consumer │ ◀────── │             │ ◀────── │             │ ◀────── │ 1,2,3,4… │
+└──────────┘  yields └─────────────┘  yields └─────────────┘  yields └──────────┘
+
+data flow, one element at a time — no intermediate lists:
+  1 ──▶ Where: odd, dropped (Select never sees it)
+  2 ──▶ Where: pass ──▶ Select: 20 ──▶ consumer
+
+foreach / ToList() / Count() start the machinery; until then the query is only
+a description.  Enumerate q twice → the whole pipeline runs twice.
+For IQueryable (EF Core) the same chain is instead translated into ONE SQL query.</pre>
+
+      <p class="diagram-title">Closure capture — why the loop prints 333</p>
+      <pre class="diagram">var actions = new List&lt;Action&gt;();
+for (int i = 0; i &lt; 3; i++)
+    actions.Add(() =&gt; Console.Write(i));      // prints 333, not 012!
+
+what the compiler generates:                       HEAP
+                                          ┌──────────────────────┐
+   loop variable i ──── lifted into ────▶ │ DisplayClass         │
+                                          │    int i;  // ONE i  │
+   lambda #1 ─────────┐                   └──────────────────────┘
+   lambda #2 ─────────┼── all three delegates reference the SAME object
+   lambda #3 ─────────┘
+   after the loop i == 3  →  every lambda reads 3
+
+fix — copy inside the body: one DisplayClass PER iteration:
+   int copy = i; actions.Add(() =&gt; Console.Write(copy));
+   lambda #1 ──▶ [copy=0]   lambda #2 ──▶ [copy=1]   lambda #3 ──▶ [copy=2]
+
+(foreach makes a fresh loop variable per iteration since C# 5 — for does not)</pre>
+
       <p class="diagram-title">async/await — what the thread actually does</p>
       <pre class="diagram">async Task&lt;string&gt; GetUserAsync(int id) {
     var http = ...;                          // ── runs synchronously on caller thread
@@ -289,6 +326,23 @@ composition root (Program.cs) does the wiring:
   services.AddScoped&lt;OrderService&gt;();          // ctor gets the gateway injected
 tests just do:  new OrderService(new FakeGateway())   — no container needed</pre>
 
+      <p class="diagram-title">Dependency resolution — how the container builds the object graph</p>
+      <pre class="diagram">HTTP request arrives ──▶ container opens a SCOPE (one per request)
+ └─ resolve OrdersController
+     └─ ctor needs OrderService              scoped   → create, remember in scope
+         ├─ ctor needs IPaymentGateway       registered as → StripeGateway
+         │    └─ ctor needs HttpClient       → from IHttpClientFactory handler pool
+         └─ ctor needs ILogger&lt;OrderService&gt; singleton → reuse process-wide instance
+
+the container reads constructor signatures recursively (reflection, cached)
+and builds the graph bottom-up:  HttpClient → StripeGateway → OrderService
+                                                          → OrdersController
+scope ends (response sent) ──▶ every IDisposable it created is disposed,
+                               reverse order of creation
+
+a missing registration fails HERE, at resolve time — and dev-time scope
+validation is what catches scoped-into-singleton (captive) at startup</pre>
+
       <p class="diagram-title">Strategy via composition — one axis per component</p>
       <pre class="diagram">inheritance explosion:                      composition:
 
@@ -302,6 +356,23 @@ tests just do:  new OrderService(new FakeGateway())   — no container needed</p
 
 adding a channel = 1 new class implementing IChannel — sender code untouched
 adding a policy  = 1 new class implementing IRetryPolicy — channels untouched</pre>
+
+      <p class="diagram-title">Decorator in the wild — call flow through a Stream stack</p>
+      <pre class="diagram">var s = new GZipStream(new BufferedStream(new FileStream("log.gz", ...)), ...);
+
+app calls s.Read(buffer)          call flows OUTSIDE-IN ──▶
+
+┌────────────┐  Read()  ┌────────────────┐  Read()  ┌────────────┐  read()  ┌──────┐
+│ GZipStream │ ───────▶ │ BufferedStream │ ───────▶ │ FileStream │ ───────▶ │  OS  │
+│ decompress │ ◀─────── │ batches 4 KB   │ ◀─────── │  syscalls  │ ◀─────── │ file │
+└────────────┘  bytes   └────────────────┘  bytes   └────────────┘  bytes   └──────┘
+      │
+      ▼  returns plaintext            ◀── data transformed INSIDE-OUT on the way back
+
+every layer implements Stream AND wraps a Stream — same shape as
+DelegatingHandler chains around HttpClient and logging decorators around
+repositories.  Need encryption too?  Wrap once more.  No
+GZipBufferedFileStream subclass explosion.</pre>
 
       <div class="link-list">
         <a href="https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/object-oriented/" target="_blank" rel="noopener">Object-oriented programming in C# — Microsoft Learn</a>
@@ -423,6 +494,58 @@ projection:   db.Orders.Select(o =&gt; new { o.Id, o.Customer.Name })  // 1 quer
 projection also skips change tracking — ideal for read endpoints.
 watch the logs: EF logs every SQL statement it sends (EnableSensitiveDataLogging
 in dev) — the N+1 is obvious the moment you look.</pre>
+
+      <p class="diagram-title">Idempotency keys — sequence of a safe retry</p>
+      <pre class="diagram">client                         API                          store
+  │  POST /payments               │                            │
+  │  Idempotency-Key: K1          │                            │
+  │ ────────────────────────────▶ │  seen K1?  no              │
+  │                               │ ─────────────────────────▶ │  save (K1, pending)
+  │                               │  charge the card…          │
+  │        ✗ timeout —            │ ─────────────────────────▶ │  save (K1, receipt R)
+  │ ◀╌╌╌╌ response lost ╌╌╌╌╌╌╌╌  │                            │
+  │                               │                            │
+  │  RETRY — same key K1          │                            │
+  │ ────────────────────────────▶ │  seen K1?  YES             │
+  │                               │ ─────────────────────────▶ │  load receipt R
+  │ ◀──────────────────────────── │  replay stored response    │
+  │  receipt R — charged ONCE     │                            │
+
+the timeout was ambiguous (did it run?) — the key makes the answer irrelevant:
+at-least-once requests, at-most-once execution.</pre>
+
+      <p class="diagram-title">Transactional outbox — sequence of a reliable event</p>
+      <pre class="diagram">handler            orders DB               relay (BackgroundService)     broker
+  │  BEGIN TX           │                          │                        │
+  │ ──────────────────▶ │ INSERT order             │                        │
+  │ ──────────────────▶ │ INSERT outbox row        │                        │
+  │  COMMIT ──────────▶ │  ◀━ atomic: both rows or neither ━                │
+  │  (request done)     │                          │                        │
+  │                     │ ◀── poll undispatched ── │                        │
+  │                     │ ─── rows ──────────────▶ │                        │
+  │                     │                          │ ── publish event ────▶ │
+  │                     │                          │ ◀───── ack ─────────── │
+  │                     │ ◀── mark dispatched ──── │                        │
+
+crash after COMMIT but before publish?  the row is still undispatched —
+the relay retries on its next poll.  Nothing is ever lost; delivery becomes
+at-least-once, so consumers deduplicate by event id.</pre>
+
+      <p class="diagram-title">Expand/contract — renaming a column under rolling deploys</p>
+      <pre class="diagram">goal: rename Name → FullName while old + new app versions share the database
+
+release 1  EXPAND     ALTER TABLE ADD FullName          old code: uses Name ✓
+                      new code: writes BOTH, reads Name
+                      backfill: SET FullName = Name WHERE FullName IS NULL
+release 2  MIGRATE    new code: reads FullName, still writes both
+release 3  CONTRACT   code touches only FullName        ALTER TABLE DROP Name
+
+deploy timeline:      v1 ▓▓▓▓▓░░░░░
+                      v2      ░░░░▓▓▓▓▓░░░░
+                      v3               ░░░░▓▓▓▓▓      ← during every ░ overlap,
+                                                        TWO versions run at once
+every intermediate schema works for both live versions — one breaking change
+split into three deployable, individually reversible steps.</pre>
 
       <div class="link-list">
         <a href="https://learn.microsoft.com/en-us/aspnet/core/" target="_blank" rel="noopener">ASP.NET Core documentation</a>
