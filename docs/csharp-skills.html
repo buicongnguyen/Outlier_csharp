@@ -55,6 +55,9 @@
     .anim { margin:14px 0 0; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
     .anim svg { width:100%; height:auto; display:block; }
     .anim svg text { font-family:inherit; }
+    .fig { margin:14px 0 0; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .fig svg { width:100%; height:auto; display:block; }
+    .fig svg text { font-family:inherit; }
     .anim [data-anim] { transition:opacity .35s ease; }
     .anim-controls { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
     .anim-btn { min-height:34px; padding:5px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font-weight:700; font-size:13px; cursor:pointer; }
@@ -160,21 +163,33 @@
       </div>
 
       <p class="diagram-title">From source to CPU — the .NET compilation pipeline</p>
-      <pre class="diagram">Program.cs ──(Roslyn, build time)──▶ IL + metadata in MyApp.dll ──(NuGet deps alongside)
-                                              │
-                                     run:  dotnet MyApp.dll
-                                              │
-                                     CLR loads assembly
-                                              │
-                            JIT compiles each method on first call
-                              tier 0: fast compile, no optimization
-                              tier 1: hot methods recompiled optimized
-                                              │
-                                        native code executes
-                                 (GC, exceptions, type safety = CLR services)
-
-AOT alternative: dotnet publish -p:PublishAot=true  →  native binary, no JIT,
-faster start, smaller memory — but no runtime codegen (limits some reflection)</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label=".NET compilation pipeline">
+          <defs><marker id="m-comp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs>
+          <text x="72" y="36" text-anchor="middle" font-size="11" fill="var(--muted)">build time</text>
+          <text x="440" y="36" text-anchor="middle" font-size="11" fill="var(--muted)">run time</text>
+          <rect x="12" y="46" width="120" height="52" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="72" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Program.cs</text>
+          <text x="72" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">C# source</text>
+          <path d="M 132 72 L 178 72" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-comp)"/>
+          <text x="156" y="62" text-anchor="middle" font-size="10.5" fill="var(--muted)">Roslyn</text>
+          <rect x="182" y="46" width="140" height="52" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="252" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">MyApp.dll</text>
+          <text x="252" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">IL + metadata</text>
+          <path d="M 322 72 L 368 72" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-comp)"/>
+          <text x="345" y="62" text-anchor="middle" font-size="10.5" fill="var(--muted)">CLR loads</text>
+          <rect x="372" y="46" width="140" height="52" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="442" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">JIT — tier 0</text>
+          <text x="442" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">fast compile, 1st call</text>
+          <path d="M 512 72 L 556 72" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-comp)"/>
+          <text x="534" y="62" text-anchor="middle" font-size="10.5" fill="var(--muted)">hot path</text>
+          <rect x="560" y="46" width="150" height="52" rx="8" fill="var(--accent-soft)" stroke="var(--accent-strong)" stroke-width="2"/>
+          <text x="635" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">tier 1 — optimized</text>
+          <text x="635" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">recompiled, full speed</text>
+          <text x="12" y="128" font-size="11.5" fill="var(--muted)">Same IL runs on x64 and ARM — the JIT specializes for the machine at run time; the CLR supplies GC, exceptions, and type safety around the native code.</text>
+          <text x="12" y="150" font-size="11.5" fill="var(--muted)">AOT alternative: dotnet publish -p:PublishAot=true → native binary, no JIT — faster start, smaller memory, but no runtime codegen (limits some reflection).</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">Value vs reference type — what assignment copies</p>
       <pre class="diagram">struct Point { int X, Y; }              class Person { string Name; }
@@ -267,21 +282,37 @@ a.X is still 1                          p.Name is "Bob" too — one object,
       </div>
 
       <p class="diagram-title">LINQ deferred execution — a pull pipeline, not a list</p>
-      <pre class="diagram">var q = nums.Where(n =&gt; n % 2 == 0).Select(n =&gt; n * 10);   // NOTHING runs yet —
-                                                           // q is a chain of iterators
-        pull (MoveNext)          pull                  pull
-┌──────────┐ ──────▶ ┌─────────────┐ ──────▶ ┌─────────────┐ ──────▶ ┌──────────┐
-│ foreach  │         │ Select  ×10 │         │ Where  even │         │ nums     │
-│ consumer │ ◀────── │             │ ◀────── │             │ ◀────── │ 1,2,3,4… │
-└──────────┘  yields └─────────────┘  yields └─────────────┘  yields └──────────┘
-
-data flow, one element at a time — no intermediate lists:
-  1 ──▶ Where: odd, dropped (Select never sees it)
-  2 ──▶ Where: pass ──▶ Select: 20 ──▶ consumer
-
-foreach / ToList() / Count() start the machinery; until then the query is only
-a description.  Enumerate q twice → the whole pipeline runs twice.
-For IQueryable (EF Core) the same chain is instead translated into ONE SQL query.</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 205" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LINQ deferred execution pull pipeline">
+          <defs>
+            <marker id="m-linq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker>
+            <marker id="m-linq2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-strong)"/></marker>
+          </defs>
+          <text x="10" y="22" font-size="12" font-family="Consolas,Menlo,monospace" fill="var(--text)">var q = nums.Where(n =&gt; n % 2 == 0).Select(n =&gt; n * 10);   // nothing runs yet</text>
+          <rect x="10" y="48" width="120" height="48" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="70" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">foreach</text>
+          <text x="70" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">consumer</text>
+          <rect x="196" y="48" width="120" height="48" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="256" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Select</text>
+          <text x="256" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">n * 10</text>
+          <rect x="382" y="48" width="120" height="48" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="442" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Where</text>
+          <text x="442" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">n % 2 == 0</text>
+          <rect x="568" y="48" width="130" height="48" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="633" y="68" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">source</text>
+          <text x="633" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">1, 2, 3, 4 …</text>
+          <path d="M 130 60 L 192 60" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-linq)"/>
+          <path d="M 316 60 L 378 60" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-linq)"/>
+          <path d="M 502 60 L 564 60" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-linq)"/>
+          <path d="M 192 84 L 130 84" stroke="var(--accent-strong)" stroke-width="2" fill="none" marker-end="url(#m-linq2)"/>
+          <path d="M 378 84 L 316 84" stroke="var(--accent-strong)" stroke-width="2" fill="none" marker-end="url(#m-linq2)"/>
+          <path d="M 564 84 L 502 84" stroke="var(--accent-strong)" stroke-width="2" fill="none" marker-end="url(#m-linq2)"/>
+          <text x="10" y="126" font-size="11.5" fill="var(--muted)">top arrows = pull: each MoveNext() asks the next iterator for one element · bottom arrows = yield: elements flow back one at a time — no intermediate lists</text>
+          <text x="10" y="148" font-size="11.5" fill="var(--text)">1 → Where: odd, dropped (Select never sees it) · 2 → Where: pass → Select: 20 → consumer</text>
+          <text x="10" y="170" font-size="11.5" fill="var(--muted)">foreach / ToList() / Count() start the machinery; until then q is only a description — enumerate twice and the whole pipeline runs twice.</text>
+          <text x="10" y="192" font-size="11.5" fill="var(--muted)">IQueryable (EF Core): the same chain is instead translated into ONE SQL query.</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">Closure capture — why the loop prints 333</p>
       <pre class="diagram">var actions = new List&lt;Action&gt;();
@@ -587,52 +618,97 @@ GZipBufferedFileStream subclass explosion.</pre>
       </div>
 
       <p class="diagram-title">ASP.NET Core middleware pipeline — down and back up</p>
-      <pre class="diagram">request ─▶ ExceptionHandler ─▶ HTTPS ─▶ StaticFiles ─▶ Routing ─▶ AuthN ─▶ AuthZ ─▶ Endpoint
-               │                            │ (file hit?                              (controller/
-               │                            │  short-circuit,                          minimal API
-               │                            ◀── respond)                               handler)
-response ◀── formats error ◀───────────────────────────────────────────────────── returns result
-
-each middleware:   async (context, next) =&gt; {
-                       // before: runs on the way DOWN
-                       await next(context);
-                       // after:  runs on the way BACK UP (reverse order)
-                   }
-order of app.Use...() = order on the way down.  Exception handler is FIRST
-so its try/catch wraps everything after it.  AuthN before AuthZ — you must
-know who the user is before asking what they may do.</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 225" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ASP.NET Core middleware pipeline">
+          <defs>
+            <marker id="m-mw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker>
+            <marker id="m-mw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-strong)"/></marker>
+            <marker id="m-mww" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--warn)"/></marker>
+          </defs>
+          <path d="M 15 34 L 700 34" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-mw)"/>
+          <text x="15" y="24" font-size="11.5" font-weight="700" fill="var(--accent-strong)">request — runs in app.Use…() registration order</text>
+          <rect x="15"  y="52" width="90" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent-strong)" stroke-width="2"/>
+          <text x="60"  y="71" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">Exception</text>
+          <text x="60"  y="87" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">handler</text>
+          <rect x="113" y="52" width="90" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="158" y="79" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">HTTPS</text>
+          <rect x="211" y="52" width="90" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="256" y="71" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">Static</text>
+          <text x="256" y="87" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">files</text>
+          <rect x="309" y="52" width="90" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="354" y="79" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">Routing</text>
+          <rect x="407" y="52" width="90" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="452" y="79" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">AuthN</text>
+          <rect x="505" y="52" width="90" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="550" y="79" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">AuthZ</text>
+          <rect x="603" y="52" width="100" height="46" rx="8" fill="var(--accent-soft)" stroke="var(--accent-strong)" stroke-width="2"/>
+          <text x="653" y="71" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">Endpoint</text>
+          <text x="653" y="87" text-anchor="middle" font-size="10.5" fill="var(--muted)">controller / handler</text>
+          <path d="M 700 118 L 15 118" stroke="var(--accent-strong)" stroke-width="2" fill="none" marker-end="url(#m-mw2)"/>
+          <text x="700" y="136" text-anchor="end" font-size="11.5" font-weight="700" fill="var(--accent-strong)">response — back up through the same middleware, reverse order</text>
+          <path d="M 256 98 L 256 114" stroke="var(--warn)" stroke-width="2" stroke-dasharray="4 3" fill="none" marker-end="url(#m-mww)"/>
+          <text x="262" y="112" font-size="10.5" fill="var(--warn)">file hit → short-circuit</text>
+          <text x="15" y="166" font-size="11.5" fill="var(--muted)">each middleware: async (ctx, next) ⇒ { /* on the way down */ await next(ctx); /* on the way back up */ }</text>
+          <text x="15" y="188" font-size="11.5" fill="var(--muted)">exception handler is FIRST so its try/catch wraps everything after it · AuthN before AuthZ — identify the user before evaluating [Authorize]</text>
+          <text x="15" y="210" font-size="11.5" fill="var(--muted)">routing before auth — authorization reads the matched endpoint's metadata to know which policy applies</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">DI lifetimes — one request vs the process</p>
-      <pre class="diagram">                 process lifetime ────────────────────────────────▶
-singleton:       [════════════ one instance for the whole app ════════════]
-                     request 1              request 2 (concurrent!)
-scoped:              [── instance A ──]     [── instance B ──]      one per request
-transient:           [x] [x]  [x]           [x]  [x]                new every resolve
-
-CAPTIVE DEPENDENCY (bug):
-  singleton ctor takes scoped DbContext ──▶ context A trapped inside the
-  singleton forever ──▶ request 2 also uses context A ──▶ two threads, one
-  non-thread-safe context ──▶ corrupt change tracking, random crashes
-fix: inject IServiceScopeFactory and create a scope per operation</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DI lifetimes timeline">
+          <defs><marker id="m-dil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted)"/></marker></defs>
+          <path d="M 110 22 L 700 22" stroke="var(--muted)" stroke-width="1.5" fill="none" marker-end="url(#m-dil)"/>
+          <text x="110" y="14" font-size="11" fill="var(--muted)">process lifetime</text>
+          <text x="10" y="58" font-size="12" font-weight="700" fill="var(--accent-strong)">singleton</text>
+          <rect x="110" y="42" width="595" height="24" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="407" y="58" text-anchor="middle" font-size="11" fill="var(--accent-strong)">one instance for the whole app — must be thread-safe</text>
+          <rect x="140" y="76" width="200" height="94" rx="8" fill="none" stroke="var(--line)" stroke-dasharray="5 4"/>
+          <text x="150" y="92" font-size="10.5" fill="var(--muted)">request 1</text>
+          <rect x="420" y="76" width="200" height="94" rx="8" fill="none" stroke="var(--line)" stroke-dasharray="5 4"/>
+          <text x="430" y="92" font-size="10.5" fill="var(--muted)">request 2 (concurrent!)</text>
+          <text x="10" y="118" font-size="12" font-weight="700" fill="var(--accent-strong)">scoped</text>
+          <rect x="152" y="102" width="176" height="22" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="240" y="117" text-anchor="middle" font-size="11" fill="var(--accent-strong)">instance A</text>
+          <rect x="432" y="102" width="176" height="22" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="520" y="117" text-anchor="middle" font-size="11" fill="var(--accent-strong)">instance B</text>
+          <text x="10" y="152" font-size="12" font-weight="700" fill="var(--accent-strong)">transient</text>
+          <rect x="152" y="138" width="16" height="16" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect x="180" y="138" width="16" height="16" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect x="208" y="138" width="16" height="16" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect x="432" y="138" width="16" height="16" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <rect x="460" y="138" width="16" height="16" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="640" y="151" text-anchor="middle" font-size="10.5" fill="var(--muted)">new every resolve</text>
+          <text x="10" y="196" font-size="11.5" font-weight="700" fill="var(--warn)">⚠ captive dependency: a singleton ctor that takes a scoped DbContext traps it for the process — request 2 shares request 1's context: two threads, one non-thread-safe tracker.</text>
+          <text x="10" y="214" font-size="11.5" fill="var(--muted)">fix: inject IServiceScopeFactory and create a scope per operation — dev-time scope validation catches this at startup.</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">Clean architecture — dependencies point inward</p>
-      <pre class="diagram">┌────────────────────────────────────────────────────────────┐
-│  Web / API        controllers, minimal APIs, filters      │  adapters
-│   ┌────────────────────────────────────────────────────┐   │
-│   │  Infrastructure   EF Core, SMTP, HTTP clients      │   │  implements ports
-│   │   ┌────────────────────────────────────────────┐   │   │
-│   │   │  Application   use cases, defines ports:   │   │   │  orchestration
-│   │   │                IOrderRepository, IClock    │   │   │
-│   │   │   ┌────────────────────────────────────┐   │   │   │
-│   │   │   │  Domain    entities, value objects,│   │   │   │  pure rules,
-│   │   │   │            invariants — refs NOTHING│  │   │   │  no framework
-│   │   │   └────────────────────────────────────┘   │   │   │
-│   │   └────────────────────────────────────────────┘   │   │
-│   └────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────┘
-project references = arrows pointing IN. Infrastructure references
-Application to implement its interfaces; Domain compiles alone.
-Tests: domain/application test with fakes — no DB, no web server.</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 265" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Clean architecture rings">
+          <defs><marker id="m-ca" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs>
+          <rect x="10" y="10" width="700" height="200" rx="12" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="26" y="34" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Web / API</text>
+          <text x="112" y="34" font-size="11" fill="var(--muted)">controllers, minimal APIs, filters — adapters</text>
+          <rect x="60" y="48" width="600" height="150" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+          <text x="76" y="70" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Infrastructure</text>
+          <text x="188" y="70" font-size="11" fill="var(--muted)">EF Core, SMTP, HTTP clients — implements the ports</text>
+          <rect x="110" y="84" width="500" height="102" rx="10" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="126" y="106" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Application</text>
+          <text x="216" y="106" font-size="11" fill="var(--muted)">use cases — defines ports: IOrderRepository, IClock</text>
+          <rect x="160" y="120" width="400" height="52" rx="10" fill="var(--accent-soft)" stroke="var(--accent-strong)" stroke-width="2"/>
+          <text x="360" y="141" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-strong)">Domain</text>
+          <text x="360" y="160" text-anchor="middle" font-size="11" fill="var(--text)">entities, value objects, invariants — references NOTHING</text>
+          <path d="M 692 105 L 668 105" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-ca)"/>
+          <path d="M 668 128 L 644 128" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-ca)"/>
+          <path d="M 644 151 L 620 151" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-ca)"/>
+          <text x="700" y="90" text-anchor="end" font-size="10.5" fill="var(--muted)">references</text>
+          <text x="700" y="103" text-anchor="end" font-size="10.5" fill="var(--muted)">point IN</text>
+          <text x="10" y="232" font-size="11.5" fill="var(--muted)">Project references point INWARD only — the compiler enforces the architecture. Infrastructure references Application to implement its interfaces; Domain compiles alone.</text>
+          <text x="10" y="252" font-size="11.5" fill="var(--muted)">Tests: domain and application logic test with fakes at the ports — no database, no web server.</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">EF Core N+1 — the query you didn't know you wrote</p>
       <pre class="diagram">var orders = db.Orders.ToList();              // SELECT * FROM Orders     (1 query)
@@ -671,56 +747,102 @@ nothing to diff — which is exactly why it belongs on read-only queries.
 One SaveChanges = one transaction: all pending changes commit or none do.</pre>
 
       <p class="diagram-title">Idempotency keys — sequence of a safe retry</p>
-      <pre class="diagram">client                         API                          store
-  │  POST /payments               │                            │
-  │  Idempotency-Key: K1          │                            │
-  │ ────────────────────────────▶ │  seen K1?  no              │
-  │                               │ ─────────────────────────▶ │  save (K1, pending)
-  │                               │  charge the card…          │
-  │        ✗ timeout —            │ ─────────────────────────▶ │  save (K1, receipt R)
-  │ ◀╌╌╌╌ response lost ╌╌╌╌╌╌╌╌  │                            │
-  │                               │                            │
-  │  RETRY — same key K1          │                            │
-  │ ────────────────────────────▶ │  seen K1?  YES             │
-  │                               │ ─────────────────────────▶ │  load receipt R
-  │ ◀──────────────────────────── │  replay stored response    │
-  │  receipt R — charged ONCE     │                            │
-
-the timeout was ambiguous (did it run?) — the key makes the answer irrelevant:
-at-least-once requests, at-most-once execution.</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 305" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Idempotency key retry sequence diagram">
+          <defs>
+            <marker id="m-idem" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker>
+            <marker id="m-idemw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--warn)"/></marker>
+            <marker id="m-idems" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-strong)"/></marker>
+          </defs>
+          <rect x="70" y="10" width="90" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="115" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-strong)">client</text>
+          <rect x="315" y="10" width="90" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="360" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-strong)">API</text>
+          <rect x="560" y="10" width="90" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="605" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-strong)">store</text>
+          <path d="M 115 36 L 115 285" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <path d="M 360 36 L 360 285" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <path d="M 605 36 L 605 285" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <text x="237" y="60" text-anchor="middle" font-size="11" fill="var(--text)">POST /payments · Idempotency-Key: K1</text>
+          <path d="M 115 66 L 356 66" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-idem)"/>
+          <text x="482" y="90" text-anchor="middle" font-size="11" fill="var(--text)">seen K1? no → save (K1, pending)</text>
+          <path d="M 360 96 L 601 96" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-idem)"/>
+          <rect x="308" y="112" width="104" height="22" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="360" y="127" text-anchor="middle" font-size="10.5" fill="var(--accent-strong)">charge the card…</text>
+          <text x="482" y="152" text-anchor="middle" font-size="11" fill="var(--text)">save (K1, receipt R)</text>
+          <path d="M 360 158 L 601 158" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-idem)"/>
+          <text x="237" y="182" text-anchor="middle" font-size="11" font-weight="700" fill="var(--warn)">✗ timeout — response lost</text>
+          <path d="M 356 188 L 119 188" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#m-idemw)"/>
+          <text x="237" y="212" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text)">RETRY — same key K1</text>
+          <path d="M 115 218 L 356 218" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-idem)"/>
+          <text x="482" y="240" text-anchor="middle" font-size="11" fill="var(--text)">seen K1? YES → load receipt R</text>
+          <path d="M 360 246 L 601 246" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-idem)"/>
+          <text x="237" y="266" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">replay stored response — charged ONCE</text>
+          <path d="M 356 272 L 119 272" stroke="var(--accent-strong)" stroke-width="2" fill="none" marker-end="url(#m-idems)"/>
+          <text x="10" y="300" font-size="11.5" fill="var(--muted)">The timeout was ambiguous (did it run?) — the key makes the answer irrelevant: at-least-once requests, at-most-once execution.</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">Transactional outbox — sequence of a reliable event</p>
-      <pre class="diagram">handler            orders DB               relay (BackgroundService)     broker
-  │  BEGIN TX           │                          │                        │
-  │ ──────────────────▶ │ INSERT order             │                        │
-  │ ──────────────────▶ │ INSERT outbox row        │                        │
-  │  COMMIT ──────────▶ │  ◀━ atomic: both rows or neither ━                │
-  │  (request done)     │                          │                        │
-  │                     │ ◀── poll undispatched ── │                        │
-  │                     │ ─── rows ──────────────▶ │                        │
-  │                     │                          │ ── publish event ────▶ │
-  │                     │                          │ ◀───── ack ─────────── │
-  │                     │ ◀── mark dispatched ──── │                        │
-
-crash after COMMIT but before publish?  the row is still undispatched —
-the relay retries on its next poll.  Nothing is ever lost; delivery becomes
-at-least-once, so consumers deduplicate by event id.</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Transactional outbox sequence diagram">
+          <defs>
+            <marker id="m-obx" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker>
+            <marker id="m-obxs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-strong)"/></marker>
+          </defs>
+          <rect x="35" y="10" width="90" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="80" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-strong)">handler</text>
+          <rect x="235" y="10" width="90" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="280" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-strong)">orders DB</text>
+          <rect x="425" y="10" width="90" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="470" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-strong)">relay</text>
+          <rect x="600" y="10" width="90" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="645" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-strong)">broker</text>
+          <text x="470" y="48" text-anchor="middle" font-size="10" fill="var(--muted)">BackgroundService</text>
+          <path d="M 80 36 L 80 275" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <path d="M 280 36 L 280 275" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <path d="M 470 52 L 470 275" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <path d="M 645 36 L 645 275" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+          <text x="180" y="66" text-anchor="middle" font-size="11" fill="var(--text)">BEGIN TX · INSERT order</text>
+          <path d="M 80 72 L 276 72" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-obx)"/>
+          <text x="180" y="94" text-anchor="middle" font-size="11" fill="var(--text)">INSERT outbox row</text>
+          <path d="M 80 100 L 276 100" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-obx)"/>
+          <text x="180" y="122" text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent-strong)">COMMIT — both rows or neither ✓</text>
+          <path d="M 80 128 L 276 128" stroke="var(--accent-strong)" stroke-width="2" fill="none" marker-end="url(#m-obxs)"/>
+          <text x="375" y="158" text-anchor="middle" font-size="11" fill="var(--text)">poll undispatched</text>
+          <path d="M 470 164 L 284 164" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-obx)"/>
+          <text x="375" y="186" text-anchor="middle" font-size="11" fill="var(--text)">rows</text>
+          <path d="M 280 192 L 466 192" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-obx)"/>
+          <text x="557" y="214" text-anchor="middle" font-size="11" fill="var(--text)">publish OrderCreated</text>
+          <path d="M 470 220 L 641 220" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-obx)"/>
+          <text x="557" y="240" text-anchor="middle" font-size="11" fill="var(--muted)">ack</text>
+          <path d="M 641 246 L 474 246" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-obx)"/>
+          <text x="375" y="264" text-anchor="middle" font-size="11" fill="var(--text)">mark dispatched</text>
+          <path d="M 470 270 L 284 270" stroke="var(--accent)" stroke-width="2" fill="none" marker-end="url(#m-obx)"/>
+          <text x="10" y="295" font-size="11.5" fill="var(--muted)">Crash after COMMIT but before publish? The row stays undispatched — retried on the next poll. Delivery becomes at-least-once ⇒ consumers dedupe by event id.</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">Expand/contract — renaming a column under rolling deploys</p>
-      <pre class="diagram">goal: rename Name → FullName while old + new app versions share the database
-
-release 1  EXPAND     ALTER TABLE ADD FullName          old code: uses Name ✓
-                      new code: writes BOTH, reads Name
-                      backfill: SET FullName = Name WHERE FullName IS NULL
-release 2  MIGRATE    new code: reads FullName, still writes both
-release 3  CONTRACT   code touches only FullName        ALTER TABLE DROP Name
-
-deploy timeline:      v1 ▓▓▓▓▓░░░░░
-                      v2      ░░░░▓▓▓▓▓░░░░
-                      v3               ░░░░▓▓▓▓▓      ← during every ░ overlap,
-                                                        TWO versions run at once
-every intermediate schema works for both live versions — one breaking change
-split into three deployable, individually reversible steps.</pre>
+      <div class="fig">
+        <svg viewBox="0 0 720 235" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Expand contract migration timeline">
+          <text x="10" y="22" font-size="12" font-weight="700" fill="var(--accent-strong)">goal: rename Name → FullName while old + new app versions share one database</text>
+          <rect x="270" y="40" width="42" height="110" rx="4" fill="var(--warn-soft)" stroke="var(--warn)" stroke-dasharray="4 3"/>
+          <rect x="480" y="78" width="42" height="110" rx="4" fill="var(--warn-soft)" stroke="var(--warn)" stroke-dasharray="4 3"/>
+          <rect x="60" y="48" width="252" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="70" y="66" font-size="11" font-weight="700" fill="var(--accent-strong)">v1 — reads/writes Name</text>
+          <text x="10" y="66" font-size="11" fill="var(--muted)">live:</text>
+          <rect x="270" y="86" width="252" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="280" y="104" font-size="11" font-weight="700" fill="var(--accent-strong)">v2 — writes BOTH, backfills</text>
+          <rect x="480" y="124" width="228" height="26" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="490" y="142" font-size="11" font-weight="700" fill="var(--accent-strong)">v3 — only FullName · DROP Name</text>
+          <text x="330" y="66" font-size="11" fill="var(--text)">EXPAND: ADD FullName · dual-write · backfill</text>
+          <text x="540" y="104" font-size="11" fill="var(--text)">MIGRATE: read FullName</text>
+          <text x="10" y="175" font-size="11" fill="var(--warn)">⚠ shaded windows: rolling deploy — TWO versions run against the same schema at once</text>
+          <text x="10" y="200" font-size="11.5" fill="var(--muted)">Every intermediate schema must work for both live versions — a hard rename breaks the old version instantly.</text>
+          <text x="10" y="220" font-size="11.5" fill="var(--muted)">One breaking change → three deployable, individually reversible steps; 'drop' ships a release behind its 'add'.</text>
+        </svg>
+      </div>
 
       <p class="diagram-title">The testing pyramid in .NET — count, speed, scope</p>
       <pre class="diagram">                                     count      speed     what it proves
