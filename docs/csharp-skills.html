@@ -916,7 +916,7 @@ One SaveChanges = one transaction: all pending changes commit or none do.</pre>
   </main>
 
   <footer>
-    <p>Last updated: 2026-07-04. Styles shared with the Isaac Sim study hub.</p>
+    <p>Last updated: 2026-07-07. Styles shared with the Isaac Sim study hub.</p>
   </footer>
 
 <script src="quiz-data.js"></script>
@@ -1213,13 +1213,13 @@ function makeAnim(rootId, frames, msPerFrame) {
   playBtn.addEventListener("click", () => {
     if (timer) return stop();
     playBtn.textContent = "⏸ Pause";
-    render(idx + 1);
     timer = setInterval(() => render(idx + 1), msPerFrame || 2800);
   });
   root.querySelector('[data-act="prev"]').addEventListener("click", () => { stop(); render(idx - 1); });
   root.querySelector('[data-act="next"]').addEventListener("click", () => { stop(); render(idx + 1); });
   render(0);
-  playBtn.click(); // autoplay, loops like a gif — user can pause/step
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+    playBtn.click(); // autoplay, loops like a gif — user can pause/step
 }
 
 makeAnim("anim-sh", [
